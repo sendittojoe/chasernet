@@ -103,3 +103,4 @@ messages.post('/:roomId', requireAuth, async (c) => {
   )
   return c.json({ id }, 201)
 })
+export default forum

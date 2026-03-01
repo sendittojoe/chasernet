@@ -10,12 +10,12 @@ crons = ["*/15 * * * *"]   # every 15 minutes
 [[d1_databases]]
 binding       = "DB"
 database_name = "chasernet-db"
-database_id   = "REPLACE_WITH_YOUR_D1_ID"   # same ID as API worker
+database_id   = "ec6ee472-7f7d-4d5f-aeeb-5740e3502cde"   # same ID as API worker
 
 # ── KV Namespace ──────────────────────────────────
 [[kv_namespaces]]
 binding = "KV"
-id      = "REPLACE_WITH_YOUR_KV_ID"
+id      = "1aee15e72bcf49cfa67255deb4a78707"
 
 [dev]
 port = 8789

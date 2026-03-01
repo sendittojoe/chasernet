@@ -48,3 +48,4 @@ battles.get('/leaderboard', async (c) => {
   )
   return c.json({ leaderboard: rows })
 })
+export default battles

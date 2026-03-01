@@ -12,7 +12,7 @@ routes = [
 [[d1_databases]]
 binding  = "DB"
 database_name = "chasernet-db"
-database_id   = "REPLACE_WITH_YOUR_D1_ID"   # from: wrangler d1 create chasernet-db
+database_id   = "ec6ee472-7f7d-4d5f-aeeb-5740e3502cde"   # from: wrangler d1 create chasernet-db
 
 # ── R2 Object Storage ────────────────────────────
 [[r2_buckets]]
@@ -22,7 +22,7 @@ bucket_name = "chasernet-assets"
 # ── KV Namespace ─────────────────────────────────
 [[kv_namespaces]]
 binding = "KV"
-id      = "REPLACE_WITH_YOUR_KV_ID"          # from: wrangler kv:namespace create CHASERNET_KV
+id      = "1aee15e72bcf49cfa67255deb4a78707"          # from: wrangler kv:namespace create CHASERNET_KV
 
 # ── Secrets (set via: wrangler secret put JWT_SECRET) ──
 # JWT_SECRET
