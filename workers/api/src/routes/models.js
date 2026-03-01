@@ -3,7 +3,6 @@ import { getDB } from '../lib/db.js'
 
 const models = new Hono()
 
-// GET /models/runs — current model run status
 models.get('/runs', async (c) => {
   const db   = getDB(c.env.DB)
   const rows = await db.all(
@@ -14,7 +13,6 @@ models.get('/runs', async (c) => {
   return c.json({ runs: rows })
 })
 
-// GET /models/runs/:id — single run status
 models.get('/runs/:id', async (c) => {
   const db  = getDB(c.env.DB)
   const row = await db.first('SELECT * FROM model_runs WHERE id = ?', [c.req.param('id')])

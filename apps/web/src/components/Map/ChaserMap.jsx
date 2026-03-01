@@ -1,123 +1,104 @@
 import { useEffect, useRef, useState } from 'react'
-import maplibregl          from 'maplibre-gl'
-import { useMapStore }     from '../../stores/mapStore.js'
-import { useRoomStore }    from '../../stores/roomStore.js'
-import { useWeatherData }  from '../../hooks/useWeatherData.js'
-import { useDisagreement } from '../../hooks/useDisagreement.js'
-import DisagreementIndex   from './DisagreementIndex.jsx'
-import WeatherCanvas       from './WeatherCanvas.jsx'
-import WeatherLayer        from './WeatherLayer.jsx'
-import TimelineScrubber    from './TimelineScrubber.jsx'
-import MapQuickToggles     from './MapQuickToggles.jsx'
-import ClickInspect        from './ClickInspect.jsx'
+import maplibregl           from 'maplibre-gl'
+import { useMapStore }      from '../../stores/mapStore.js'
+import { useRoomStore }     from '../../stores/roomStore.js'
+import { useWeatherData }   from '../../hooks/useWeatherData.js'
+import { useDisagreement }  from '../../hooks/useDisagreement.js'
+import DisagreementIndex    from './DisagreementIndex.jsx'
+import WeatherCanvas        from './WeatherCanvas.jsx'
+import WeatherLayer         from './WeatherLayer.jsx'
+import MapControlBar        from './MapControlBar.jsx'
 
-const MAPTILER_KEY = 'u3sB039ED5sMmJTQH8Ov'
+const GLOBAL_STORMS = [
+  { id:'beatriz-2026',   name:'Hurricane Beatriz', lat:16.2, lon:-104.8, cat:'C3',  color:'#EF4444', wind:115 },
+  { id:'invest96w-2026', name:'Invest 96W',         lat:14.8, lon:138.2,  cat:'INV', color:'#8B5CF6', wind:35  },
+  { id:'ana-2026',       name:'T.S. Ana',            lat:22.1, lon:-65.4,  cat:'TS',  color:'#F59E0B', wind:55  },
+  { id:'yagi-2026',      name:'Typhoon Yagi',        lat:18.4, lon:125.6,  cat:'TY',  color:'#EF4444', wind:130 },
+]
+const CAT_COLORS = { TD:'#38BDF8',TS:'#F59E0B',C1:'#FCD34D',C2:'#FB923C',C3:'#EF4444',C4:'#DC2626',C5:'#7F1D1D',TY:'#EF4444',STY:'#7F1D1D',INV:'#8B5CF6' }
 
 export default function ChaserMap() {
-  const mapRef = useRef(null)
-  const mapObj = useRef(null)
+  const mapRef = useRef(null), mapObj = useRef(null)
   const [ready, setReady] = useState(false)
-  const { activeRoom, getRoom } = useRoomStore()
+  const markersRef = useRef([]), locationMarkerRef = useRef(null)
+  const { activeRoom, getRoom, setActiveRoom } = useRoomStore()
+  const { userLocation, setUserLocation, setLocationLoading, setLocationError } = useMapStore()
   const room = getRoom(activeRoom)
-  const { showRadar, showSatellite, showSST, setInspectPoint, inspectPoint } = useMapStore()
   useWeatherData()
 
   useEffect(() => {
     if (mapObj.current) return
-    mapObj.current = new maplibregl.Map({
-      container: mapRef.current,
-      style: 'https://api.maptiler.com/maps/dataviz-dark/style.json?key=' + MAPTILER_KEY,
-      center: [room?.lon ?? -60, room?.lat ?? 20],
-      zoom: 3.5, minZoom: 2, maxZoom: 14,
-      attributionControl: false, pitchWithRotate: false, dragRotate: false,
-    })
-    mapObj.current.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
-    mapObj.current.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }), 'bottom-right')
-    mapObj.current.on('load', async () => {
-      await loadRainViewerLayers(mapObj.current)
-      setReady(true)
-    })
-    mapObj.current.on('click', (e) => {
-      const { lng, lat } = e.lngLat
-      setInspectPoint({ lat: parseFloat(lat.toFixed(4)), lon: parseFloat(lng.toFixed(4)) })
-    })
+    mapObj.current.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'top-right')
+    mapObj.current.addControl(new maplibregl.ScaleControl({ maxWidth:100, unit:'nautical' }), 'bottom-right')
+    mapObj.current.on('load', () => setReady(true))
     return () => { mapObj.current?.remove(); mapObj.current = null }
   }, [])
 
   useEffect(() => {
-    if (!mapObj.current || !room) return
-    mapObj.current.flyTo({ center: [room.lon, room.lat], zoom: 4.5, speed: 0.9, curve: 1.4 })
-  }, [activeRoom])
+    if (!navigator.geolocation) return
+    setLocationLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      pos => { const loc={lat:pos.coords.latitude,lon:pos.coords.longitude}; setUserLocation(loc); if(!activeRoom&&mapObj.current) mapObj.current.flyTo({center:[loc.lon,loc.lat],zoom:4,speed:1.2,curve:1.6}) },
+      err => setLocationError(err.message),
+      { enableHighAccuracy:false, timeout:8000 }
+    )
+  }, [])
 
   useEffect(() => {
-    if (!mapObj.current || !ready) return
-    if (mapObj.current.getLayer('radar-layer'))
-      mapObj.current.setPaintProperty('radar-layer', 'raster-opacity', showRadar ? 0.7 : 0)
-  }, [showRadar, ready])
+    if (!ready||!mapObj.current||!userLocation) return
+    if (locationMarkerRef.current) locationMarkerRef.current.remove()
+    if (!document.getElementById('loc-pulse')) { const s=document.createElement('style');s.id='loc-pulse';s.textContent='@keyframes locPulse{0%{box-shadow:0 0 0 0 rgba(56,189,248,0.6)}70%{box-shadow:0 0 0 16px rgba(56,189,248,0)}100%{box-shadow:0 0 0 0 rgba(56,189,248,0)}}';document.head.appendChild(s) }
+    const el=document.createElement('div')
+    el.style.cssText='width:14px;height:14px;border-radius:50%;background:rgba(56,189,248,0.35);border:2.5px solid #38BDF8;animation:locPulse 2s infinite;cursor:pointer;'
+    locationMarkerRef.current=new maplibregl.Marker({element:el}).setLngLat([userLocation.lon,userLocation.lat]).setPopup(new maplibregl.Popup({offset:12}).setHTML(`<div style="font-family:monospace;font-size:11px;color:#38BDF8;background:#0D1929;padding:6px 10px;border-radius:6px;">📍 Your location<br/><span style="color:#6B7280">${userLocation.lat.toFixed(2)}°, ${userLocation.lon.toFixed(2)}°</span></div>`)).addTo(mapObj.current)
+  }, [ready, userLocation])
 
   useEffect(() => {
-    if (!mapObj.current || !ready) return
-    if (mapObj.current.getLayer('satellite-layer'))
-      mapObj.current.setPaintProperty('satellite-layer', 'raster-opacity', showSatellite ? 0.65 : 0)
-  }, [showSatellite, ready])
+    if (!ready||!mapObj.current) return
+    markersRef.current.forEach(m=>m.remove()); markersRef.current=[]
+    if (!document.getElementById('storm-pulse')) { const s=document.createElement('style');s.id='storm-pulse';s.textContent='@keyframes stormPulse{0%,100%{opacity:0.85}50%{opacity:1}} .storm-mk{transition:transform 0.15s}.storm-mk:hover{transform:scale(1.3)!important}';document.head.appendChild(s) }
+    GLOBAL_STORMS.forEach(storm => {
+      const color=CAT_COLORS[storm.cat]??'#EF4444', size=['C3','C4','C5','TY','STY'].includes(storm.cat)?32:24
+      const el=document.createElement('div'); el.className='storm-mk'
+      el.style.cssText=`width:${size}px;height:${size}px;border-radius:50%;background:${color}20;border:2px solid ${color};display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 16px ${color}50;animation:stormPulse 3s infinite;`
+      el.innerHTML=`<span style="font-size:7px;font-family:monospace;font-weight:800;color:${color}">${storm.cat==='INV'?'?':storm.wind+'kt'}</span>`
+      el.addEventListener('click',()=>{ setActiveRoom(storm.id); mapObj.current.flyTo({center:[storm.lon,storm.lat],zoom:5,speed:1,curve:1.4}) })
+      const marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat([storm.lon,storm.lat]).setPopup(new maplibregl.Popup({offset:16}).setHTML(`<div style="font-family:monospace;font-size:11px;background:#0D1929;padding:8px 12px;border-radius:8px;border:1px solid ${color}40"><div style="color:${color};font-weight:800;margin-bottom:3px">${storm.name}</div><div style="color:#94A3B8">${storm.cat} · ${storm.wind}kt · Click to open room</div></div>`)).addTo(mapObj.current)
+      markersRef.current.push(marker)
+    })
+  }, [ready])
 
-  useEffect(() => {
-    if (!mapObj.current || !ready) return
-    if (mapObj.current.getLayer('sst-layer'))
-      mapObj.current.setPaintProperty('sst-layer', 'raster-opacity', showSST ? 0.55 : 0)
-  }, [showSST, ready])
+  useEffect(() => { if(mapObj.current&&room) mapObj.current.flyTo({center:[room.lon,room.lat],zoom:5,speed:0.9,curve:1.4}) }, [activeRoom])
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
-      <div style={{ height:44, background:'var(--panel)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', padding:'0 14px', gap:10, flexShrink:0, overflow:'auto' }}>
+    <div style={{flex:1,display:'flex',flexDirection:'column',position:'relative',height:'100%'}}>
+      <div style={{height:44,background:'var(--panel)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',padding:'0 12px',gap:10,flexShrink:0,zIndex:10}}>
         {room ? (
           <>
-            <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-              <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--red)', animation:'pulse 2s infinite' }}/>
-              <span style={{ fontWeight:700, color:'var(--red)', fontSize:12, fontFamily:'var(--mono)' }}>{room.name}</span>
-              <span style={{ color:'var(--t3)', fontSize:11 }}>·</span>
-              <span style={{ color:'var(--t2)', fontSize:11 }}>{room.category} · {room.wind}kt · {room.pressure}mb</span>
-            </div>
-            <div style={{ width:1, height:18, background:'var(--border)' }}/>
+            <div style={{width:7,height:7,borderRadius:'50%',background:'var(--red)',animation:'pulse 2s infinite',flexShrink:0}}/>
+            <span style={{fontWeight:800,color:'var(--red)',fontSize:12,fontFamily:'var(--mono)'}}>{room.name}</span>
+            <span style={{color:'var(--t3)'}}>·</span>
+            <span style={{color:'var(--t2)',fontSize:11}}>{room.category} · {room.wind}kt · {room.pressure}mb</span>
+            <div style={{width:1,height:18,background:'var(--border)'}}/>
             <DisagreementIndex />
-            <div style={{ flex:1 }}/>
-            <MapQuickToggles />
+            <button onClick={()=>setActiveRoom(null)} style={{marginLeft:'auto',padding:'3px 8px',borderRadius:5,border:'1px solid var(--border)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'var(--mono)',fontSize:9}}>← GLOBAL</button>
           </>
         ) : (
-          <span style={{ color:'var(--t2)', fontSize:12, fontFamily:'var(--mono)' }}>⚡ ChaserNet — Select a storm room</span>
+          <span style={{color:'var(--t2)',fontSize:11,fontFamily:'var(--mono)'}}>
+            ⚡ ChaserNet — Global View
+            {userLocation&&<span style={{color:'var(--t3)',marginLeft:10,fontSize:10}}>📍 {userLocation.lat.toFixed(1)}°, {userLocation.lon.toFixed(1)}°</span>}
+          </span>
         )}
       </div>
-      <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
-        <div ref={mapRef} style={{ position:'absolute', inset:0 }} />
-        {ready && <WeatherLayer map={mapObj.current} />}
-        {ready && <WeatherCanvas map={mapObj.current} />}
-        {room && <TimelineScrubber />}
-        {inspectPoint && <ClickInspect map={mapObj.current} />}
-        <div style={{ position:'absolute', bottom:30, left:8, fontSize:9, color:'rgba(255,255,255,0.2)', fontFamily:'var(--mono)', pointerEvents:'none' }}>
-          \u00a9 MapTiler · OpenStreetMap · Open-Meteo · RainViewer
+      <div style={{flex:1,position:'relative',overflow:'hidden'}}>
+        <div ref={mapRef} style={{position:'absolute',inset:0}}/>
+        {ready && <WeatherLayer map={mapObj.current}/>}
+        {ready && <WeatherCanvas map={mapObj.current}/>}
+        <MapControlBar />
+        <div style={{position:'absolute',bottom:8,right:110,fontSize:9,color:'rgba(255,255,255,0.18)',fontFamily:'var(--mono)',pointerEvents:'none',zIndex:5}}>
+          MapTiler · OpenStreetMap · Open-Meteo · RainViewer
         </div>
       </div>
     </div>
   )
-}
-
-async function loadRainViewerLayers(map) {
-  try {
-    const res  = await fetch('https://api.rainviewer.com/public/weather-maps.json')
-    const data = await res.json()
-    const radarFrames = data.radar?.past ?? []
-    const latestRadar = radarFrames[radarFrames.length - 1]
-    if (latestRadar) {
-      map.addSource('radar', { type:'raster', tiles: ['https://tilecache.rainviewer.com/v2/radar/' + latestRadar.time + '/512/{z}/{x}/{y}/8/1_1.png'], tileSize:512 })
-      map.addLayer({ id:'radar-layer', type:'raster', source:'radar', paint:{ 'raster-opacity':0 } })
-    }
-    const satFrames = data.satellite?.infrared ?? []
-    const latestSat = satFrames[satFrames.length - 1]
-    if (latestSat) {
-      map.addSource('satellite-ir', { type:'raster', tiles: ['https://tilecache.rainviewer.com/v2/satellite/infrared/' + latestSat.time + '/512/{z}/{x}/{y}/0/0_0.png'], tileSize:512 })
-      map.addLayer({ id:'satellite-layer', type:'raster', source:'satellite-ir', paint:{ 'raster-opacity':0 } })
-    }
-    map.addSource('sst', { type:'raster', tiles:['https://coastwatch.pfeg.noaa.gov/erddap/wms/erdMH1sstd8day/request?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&BBOX={bbox-epsg-3857}&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&LAYERS=erdMH1sstd8day:sstMasked&STYLES=&FORMAT=image/png&TRANSPARENT=TRUE&colorBarMinimum=18&colorBarMaximum=32&colorBarPalette=KT_thermal'], tileSize:256 })
-    map.addLayer({ id:'sst-layer', type:'raster', source:'sst', paint:{ 'raster-opacity':0 } })
-  } catch(e) { console.warn('[ChaserMap] layer load failed:', e.message) }
 }

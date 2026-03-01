@@ -47,7 +47,7 @@ export default function WeatherCanvas({ map }) {
       if (!trackA || trackA.length === 0) { animRef.current = requestAnimationFrame(draw); return }
       const [sx, sy] = project(map, trackA[0][2], trackA[0][1])
       drawAtmosphere(ctx, ms.layer, sx, sy, W, H)
-      if ((ms.split || ms.spaghetti) && trackB && trackB !== trackA) drawCone(ctx, map, trackA, trackB, ms.hour)
+      if ((ms.activeModels?.length > 1 || ms.spaghetti) && trackB && trackB !== trackA) drawCone(ctx, map, trackA, trackB, ms.hour)
       if (ms.spaghetti) drawSpaghetti(ctx, map, trackA)
       drawTrack(ctx, map, trackA, '#38BDF8', false)
       if (ms.split && trackB && trackB !== trackA) drawTrack(ctx, map, trackB, '#F59E0B', true)
@@ -64,7 +64,7 @@ export default function WeatherCanvas({ map }) {
     return () => cancelAnimationFrame(animRef.current)
   }, [map, activeRoom])
 
-  return <canvas ref={canvasRef} style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:5, opacity: activeRoom ? 1 : 0.15, transition:'opacity 0.4s' }} />
+  return <canvas ref={canvasRef} style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:5, opacity: activeRoom ? 1 : 0.4, transition:'opacity 0.4s' }} />
 }
 
 function project(map, lon, lat) { const pt = map.project([lon, lat]); return [pt.x, pt.y] }

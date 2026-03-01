@@ -25,7 +25,7 @@ export default function RightPanel() {
       flexShrink:   0,
       overflow:     'hidden',
     }}>
-      {activeRoom ? (
+      {true ? (
         <>
           {/* Tab bar */}
           <div style={{ display:'flex', borderBottom:'1px solid var(--border)', flexShrink:0 }}>

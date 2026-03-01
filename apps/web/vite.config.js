@@ -16,6 +16,7 @@ export default defineConfig({
         theme_color:      '#060A12',
         background_color: '#060A12',
         display:          'standalone',
+        apple: { statusBarStyle: 'black-translucent' },
         orientation:      'portrait-primary',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

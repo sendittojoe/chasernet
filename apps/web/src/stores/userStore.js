@@ -1,22 +1,19 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-/**
- * userStore — authentication and user profile.
- * Persisted to localStorage so sessions survive page refresh.
- */
+const API = 'https://api.chasernet.com'
+
 export const useUserStore = create(
   persist(
     (set, get) => ({
-      user:  null,    // { id, username, role, avatarColor, bio, location, forecastScore }
-      token: null,    // JWT
-
-      // ── Actions ──────────────────────────────────────
+      user:               null,
+      token:              null,
+      onboardingComplete: false,
 
       login: (user, token) => set({ user, token }),
 
       logout: () => {
-        set({ user: null, token: null })
+        set({ user: null, token: null, onboardingComplete: false })
         window.location.href = '/'
       },
 
@@ -24,25 +21,45 @@ export const useUserStore = create(
         user: state.user ? { ...state.user, ...patch } : null,
       })),
 
-      // Helper: return Authorization header for fetch calls
+      saveTagsAndOnboard: async (regionTags, interestTags, experienceLevel) => {
+        set(state => ({
+          onboardingComplete: true,
+          user: state.user ? { ...state.user, regionTags, interestTags, experienceLevel } : null,
+        }))
+        const { token } = get()
+        if (token) {
+          fetch(API + '/users/me', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({ regionTags, interestTags, experienceLevel, onboardingComplete: true }),
+          }).catch(() => {})
+        }
+        return true
+      },
+
+      saveProfile: async (fields) => {
+        set(state => ({ user: state.user ? { ...state.user, ...fields } : null }))
+        const { token } = get()
+        if (token) {
+          fetch(API + '/users/me', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify(fields),
+          }).catch(() => {})
+        }
+      },
+
       authHeader: () => {
         const { token } = get()
-        return token ? { Authorization: `Bearer ${token}` } : {}
+        return token ? { Authorization: 'Bearer ' + token } : {}
       },
 
-      isAdmin: () => {
-        const { user } = get()
-        return user?.role === 'admin' || user?.role === 'owner'
-      },
-
-      isMod: () => {
-        const { user } = get()
-        return ['owner','admin','moderator'].includes(user?.role)
-      },
+      isAdmin: () => ['owner','co_creator','admin'].includes(get().user?.role),
+      isMod:   () => ['owner','co_creator','admin','moderator'].includes(get().user?.role),
     }),
     {
-      name:    'chasernet-user',
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      name: 'chasernet-user',
+      partialize: (s) => ({ user: s.user, token: s.token, onboardingComplete: s.onboardingComplete }),
     }
   )
 )

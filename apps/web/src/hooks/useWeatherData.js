@@ -1,80 +1,71 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useMapStore }  from '../stores/mapStore.js'
 import { useRoomStore } from '../stores/roomStore.js'
 
 const OM_MODELS = {
-  'Euro IFS':  'ecmwf_ifs025',
-  'GFS':       'gfs025',
-  'EC-AIFS':   'ecmwf_aifs025',
-  'HRRR':      'best_match',
-  'ICON':      'icon_global',
-  'NAM 3km':   'best_match',
-  'CMC':       'gem_global',
-  'UKMET':     'ukmo_global',
-  'GraphCast': 'ecmwf_aifs025',
-  'GEFS':      'gfs025',
+  'Euro IFS':'ecmwf_ifs025','GFS':'gfs025','EC-AIFS':'ecmwf_aifs025',
+  'HRRR':'best_match','ICON':'icon_global','NAM 3km':'best_match',
+  'CMC':'gem_global','UKMET':'ukmo_global','GraphCast':'ecmwf_aifs025','GEFS':'gfs025',
 }
 
-function buildUrl(modelName, lat, lon) {
-  const model = OM_MODELS[modelName] ?? 'best_match'
-  const params = new URLSearchParams({
-    latitude: lat, longitude: lon,
+function buildUrl(modelId, lat, lon) {
+  return 'https://api.open-meteo.com/v1/forecast?' + new URLSearchParams({
+    latitude: String(lat), longitude: String(lon),
     hourly: 'windspeed_10m,winddirection_10m,temperature_2m,precipitation,cape,pressure_msl',
-    wind_speed_unit: 'kn', models: model, forecast_days: '7', timezone: 'UTC',
+    wind_speed_unit: 'kn', models: OM_MODELS[modelId] ?? 'best_match',
+    forecast_days: '7', timezone: 'UTC',
   })
-  return 'https://api.open-meteo.com/v1/forecast?' + params
 }
 
 function buildTrack(lat, lon, hourly) {
   const { windspeed_10m: speeds, winddirection_10m: dirs } = hourly
   if (!speeds || !dirs) return [[0, lat, lon]]
-  const track = [[0, lat, lon]]
-  let curLat = lat, curLon = lon
-  const DEG_PER_NM = 1/60
-  for (let h = 0; h < Math.min(168, speeds.length-1); h += 6) {
-    let avgSpeed=0, sinSum=0, cosSum=0
-    for (let i=h; i<h+6&&i<speeds.length; i++) {
-      const rad=(dirs[i]??0)*Math.PI/180
-      avgSpeed+=(speeds[i]??0)/6; sinSum+=Math.sin(rad)/6; cosSum+=Math.cos(rad)/6
+  const track = [[0, lat, lon]]; let cLat = lat, cLon = lon
+  for (let h = 0; h < Math.min(168, speeds.length - 1); h += 6) {
+    let spd=0, sin=0, cos=0
+    for (let i=h; i<h+6 && i<speeds.length; i++) {
+      const r=(dirs[i]??0)*Math.PI/180; spd+=(speeds[i]??0)/6; sin+=Math.sin(r)/6; cos+=Math.cos(r)/6
     }
-    const steeringKt=avgSpeed*0.55, movDir=Math.atan2(sinSum,cosSum), distNm=steeringKt*6
-    curLat+=Math.cos(movDir)*distNm*DEG_PER_NM+0.05
-    curLon+=Math.sin(movDir)*distNm*DEG_PER_NM-0.03
-    track.push([h+6, parseFloat(curLat.toFixed(4)), parseFloat(curLon.toFixed(4))])
+    cLat+=Math.cos(Math.atan2(sin,cos))*spd*0.55*6/60+0.05
+    cLon+=Math.sin(Math.atan2(sin,cos))*spd*0.55*6/60-0.03
+    track.push([h+6, parseFloat(cLat.toFixed(4)), parseFloat(cLon.toFixed(4))])
   }
   return track
 }
 
+async function fetchModel(modelId, lat, lon, setModelData) {
+  console.log(`🌐 Fetching ${modelId} @ ${lat},${lon}`)
+  try {
+    const res = await fetch(buildUrl(modelId, lat, lon))
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const raw = await res.json()
+    if (!raw?.hourly?.windspeed_10m) throw new Error('missing hourly data')
+    const track = buildTrack(lat, lon, raw.hourly)
+    setModelData(modelId, { raw, track, model: modelId })
+    console.log(`✅ ${modelId} loaded — ${raw.hourly.windspeed_10m.length} steps`)
+  } catch (err) {
+    console.error(`❌ ${modelId} failed:`, err.message)
+  }
+}
+
 export function useWeatherData() {
-  const { modelA, modelB, setDataA, setDataB, setDataLoading, setDataError } = useMapStore()
+  const { activeModels, primaryModel, setModelData, userLocation, activeLayers, setLayer } = useMapStore()
   const { activeRoom, getRoom } = useRoomStore()
-  const prevA = useRef(null), prevB = useRef(null)
   const room = getRoom(activeRoom)
-  const lat = room?.lat ?? 16.2, lon = room?.lon ?? -104.8
-  const coords = lat+','+lon
+  const lat  = room?.lat ?? userLocation?.lat ?? 20
+  const lon  = room?.lon ?? userLocation?.lon ?? -40
 
   useEffect(() => {
-    const key = modelA+'|'+coords
-    if (prevA.current === key) return
-    prevA.current = key
-    let cancelled = false
-    setDataLoading(true)
-    fetch(buildUrl(modelA, lat, lon))
-      .then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json() })
-      .then(raw => { if (cancelled) return; const track=buildTrack(lat,lon,raw.hourly??{}); setDataA({raw,track,model:modelA}); setDataLoading(false); console.log('[useWeatherData] '+modelA+': '+track.length+' pts') })
-      .catch(err => { if (!cancelled) { setDataError(err.message); setDataLoading(false) } })
-    return () => { cancelled = true }
-  }, [modelA, coords])
+    const first = activeLayers.find(l => l.visible)
+    if (first) setLayer(first.id)
+  }, [activeLayers])
 
   useEffect(() => {
-    const key = modelB+'|'+coords
-    if (prevB.current === key) return
-    prevB.current = key
-    let cancelled = false
-    fetch(buildUrl(modelB, lat, lon))
-      .then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json() })
-      .then(raw => { if (cancelled) return; const track=buildTrack(lat,lon,raw.hourly??{}); setDataB({raw,track,model:modelB}); console.log('[useWeatherData] '+modelB+': '+track.length+' pts') })
-      .catch(err => console.warn('[useWeatherData] Model B failed:', err))
-    return () => { cancelled = true }
-  }, [modelB, coords])
+    const rLat = parseFloat(lat.toFixed(2))
+    const rLon = parseFloat(lon.toFixed(2))
+    fetchModel(primaryModel, rLat, rLon, setModelData)
+    const others = activeModels.filter(m => m !== primaryModel)
+    const timers = others.map((id, i) => setTimeout(() => fetchModel(id, rLat, rLon, setModelData), 1000 + i * 500))
+    return () => timers.forEach(clearTimeout)
+  }, [primaryModel, activeModels.join(','), Math.round(lat * 10), Math.round(lon * 10)])
 }
