@@ -2,15 +2,12 @@ import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '../stores/userStore.js'
 import { useState }     from 'react'
 
-/**
- * Public landing page.
- * Shows marketing content + login/signup forms.
- * TODO: Replace stub with full landing design in Phase 1 Day 13.
- */
+const API_BASE = import.meta.env.VITE_API_BASE ?? ''
+
 export default function Landing() {
   const navigate    = useNavigate()
   const { login }   = useUserStore()
-  const [mode, setMode] = useState('login')   // 'login' | 'signup'
+  const [mode, setMode] = useState('login')
   const [form, setForm] = useState({ username:'', email:'', password:'' })
   const [err,  setErr]  = useState(null)
   const [loading, setLoading] = useState(false)
@@ -21,7 +18,7 @@ export default function Landing() {
     setErr(null)
     setLoading(true)
     try {
-      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const endpoint = mode === 'login' ? `${API_BASE}/auth/login` : `${API_BASE}/auth/register`
       const res = await fetch(endpoint, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,7 +35,6 @@ export default function Landing() {
     }
   }
 
-  // Quick dev bypass — remove before launch
   function devBypass() {
     login({ id:'dev', username:'dev_user', role:'admin', avatarColor:'#38BDF8' }, 'dev-token')
     navigate('/app')
@@ -55,8 +51,6 @@ export default function Landing() {
       fontFamily: 'var(--sans)',
     }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
-
-        {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:32 }}>
           <div style={{ fontSize:48, marginBottom:8 }}>⚡</div>
           <h1 style={{ fontSize:28, fontWeight:800, color:'var(--blue)', fontFamily:'var(--mono)', letterSpacing:'-0.03em' }}>
@@ -67,7 +61,6 @@ export default function Landing() {
           </p>
         </div>
 
-        {/* Tab switcher */}
         <div style={{ display:'flex', marginBottom:20, background:'var(--card)', borderRadius:8, padding:3 }}>
           {['login','signup'].map(m => (
             <button key={m} onClick={() => setMode(m)} style={{
@@ -81,7 +74,6 @@ export default function Landing() {
           ))}
         </div>
 
-        {/* Form fields */}
         {mode === 'signup' && (
           <div style={{ marginBottom:12 }}>
             <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>USERNAME</label>
@@ -89,11 +81,13 @@ export default function Landing() {
               placeholder="wx_hawk" style={{ width:'100%', padding:'10px 12px' }} />
           </div>
         )}
+
         <div style={{ marginBottom:12 }}>
           <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>EMAIL</label>
           <input type="email" value={form.email} onChange={e => update('email', e.target.value)}
             placeholder="you@example.com" style={{ width:'100%', padding:'10px 12px' }} />
         </div>
+
         <div style={{ marginBottom:20 }}>
           <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>PASSWORD</label>
           <input type="password" value={form.password} onChange={e => update('password', e.target.value)}
@@ -115,7 +109,6 @@ export default function Landing() {
           {loading ? 'Loading…' : mode === 'login' ? 'Log In' : 'Create Account'}
         </button>
 
-        {/* Dev bypass button — REMOVE BEFORE LAUNCH */}
         {import.meta.env.DEV && (
           <button onClick={devBypass} style={{
             width:'100%', marginTop:10, padding:'9px', background:'transparent',
