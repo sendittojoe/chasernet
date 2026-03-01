@@ -1,14 +1,17 @@
-import { Outlet }       from 'react-router-dom'
-import NavRail          from '../components/Nav/NavRail.jsx'
-import ChaserMap        from '../components/Map/ChaserMap.jsx'
-import RightPanel       from '../components/StormRoom/RightPanel.jsx'
-import { useRoomStore } from '../stores/roomStore.js'
-import { useLocation }  from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
+import NavRail                 from '../components/Nav/NavRail.jsx'
+import ChaserMap               from '../components/Map/ChaserMap.jsx'
+import RightPanel              from '../components/StormRoom/RightPanel.jsx'
+import { useStorms }           from '../hooks/useStorms.js'
+import { useWeatherData }      from '../hooks/useWeatherData.js'
 
 export default function Shell() {
-  const { activeRoom } = useRoomStore()
-  const location       = useLocation()
-  const isAdmin        = location.pathname === '/app/admin'
+  const location = useLocation()
+  const isAdmin  = location.pathname === '/app/admin'
+
+  // Global hooks — run everywhere
+  useStorms()      // loads real storms from API into nav rail
+  useWeatherData() // fetches Open-Meteo tracks for active storm
 
   if (isAdmin) {
     return (
