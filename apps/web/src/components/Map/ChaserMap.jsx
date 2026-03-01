@@ -28,6 +28,7 @@ export default function ChaserMap() {
 
   useEffect(() => {
     if (mapObj.current) return
+    mapObj.current = new maplibregl.Map({ container: mapRef.current, style: 'https://tiles.openfreemap.org/styles/liberty', center: [-40, 20], zoom: 3, minZoom: 2, maxZoom: 14 })
     mapObj.current.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'top-right')
     mapObj.current.addControl(new maplibregl.ScaleControl({ maxWidth:100, unit:'nautical' }), 'bottom-right')
     mapObj.current.on('load', () => setReady(true))
