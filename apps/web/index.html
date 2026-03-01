@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Primary meta -->
+    <title>ChaserNet — Real-Time Storm Tracking</title>
+    <meta name="description" content="Professional storm tracking, multi-model weather comparison, and the community built around it." />
+    <meta name="theme-color" content="#060A12" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ChaserNet" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title"       content="ChaserNet" />
+    <meta property="og:description" content="Real-time storm tracking & weather community" />
+    <meta property="og:image"       content="https://chasernet.com/og-image.png" />
+    <meta property="og:url"         content="https://chasernet.com" />
+    <meta property="og:type"        content="website" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="ChaserNet" />
+    <meta name="twitter:description" content="Real-time storm tracking & weather community" />
+    <meta name="twitter:image"       content="https://chasernet.com/og-image.png" />
+
+    <!-- MapLibre CSS — loaded here so it doesn't flash -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

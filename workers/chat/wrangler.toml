@@ -1,0 +1,19 @@
+name               = "chasernet-chat"
+main               = "src/index.js"
+compatibility_date = "2024-01-01"
+
+routes = [
+  { pattern = "chat.chasernet.com/*", zone_name = "chasernet.com" }
+]
+
+# ── Durable Objects ───────────────────────────────
+[[durable_objects.bindings]]
+name       = "STORM_ROOM"
+class_name = "StormRoomDO"
+
+[[migrations]]
+tag                  = "v1"
+new_classes          = ["StormRoomDO"]
+
+[dev]
+port = 8788

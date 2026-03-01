@@ -1,0 +1,27 @@
+{
+  "name": "chasernet",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "workers/api",
+    "workers/cron",
+    "workers/chat",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev":       "npm run dev --workspace=apps/web",
+    "build":     "npm run build --workspace=apps/web",
+    "deploy":    "node scripts/deploy.js",
+    "db:init":   "wrangler d1 execute chasernet-db --file=schema/d1-schema.sql",
+    "db:seed":   "wrangler d1 execute chasernet-db --file=schema/d1-seed.sql",
+    "db:local":  "wrangler d1 execute chasernet-db --local --file=schema/d1-schema.sql",
+    "workers:dev": "concurrently \"npm run dev -w workers/api\" \"npm run dev -w workers/chat\"",
+    "lint":      "eslint apps/web/src --ext .js,.jsx",
+    "typecheck": "echo 'No TS yet — add when ready'"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "wrangler": "^3.40.0"
+  }
+}

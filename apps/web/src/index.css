@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --bg:       #060A12;
+  --panel:    #0C1526;
+  --card:     #111E35;
+  --border:   #1C2E4A;
+  --borderhi: #2A4468;
+  --blue:     #38BDF8;
+  --amber:    #F59E0B;
+  --green:    #10B981;
+  --red:      #EF4444;
+  --violet:   #8B5CF6;
+  --orange:   #F97316;
+  --t1:       #DCE4F7;
+  --t2:       #6B7A9E;
+  --t3:       #3A4460;
+  --mono:     'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --radius:   8px;
+  --radius-lg:14px;
+}
+
+/* ═══════════════════════════════════════════
+   RESET
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--t1);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ═══════════════════════════════════════════
+   SCROLLBARS
+═══════════════════════════════════════════ */
+::-webkit-scrollbar           { width: 4px; height: 4px; }
+::-webkit-scrollbar-track     { background: transparent; }
+::-webkit-scrollbar-thumb     { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--borderhi); }
+
+/* ═══════════════════════════════════════════
+   MAPLIBRE OVERRIDES
+═══════════════════════════════════════════ */
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-logo          { display: none !important; }
+.maplibregl-canvas              { cursor: crosshair !important; }
+.maplibregl-ctrl-group          { background: var(--panel) !important; border: 1px solid var(--border) !important; }
+.maplibregl-ctrl-group button   { background: transparent !important; color: var(--t2) !important; }
+.maplibregl-ctrl-group button:hover { background: var(--card) !important; }
+.maplibregl-ctrl-zoom-in  .maplibregl-ctrl-icon,
+.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon { filter: invert(0.7); }
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════ */
+@keyframes pulse   { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }
+@keyframes fadein  { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes slideup { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes spin    { to { transform: rotate(360deg) } }
+@keyframes glow    { 0%, 100% { box-shadow: 0 0 8px var(--red) } 50% { box-shadow: 0 0 20px var(--red) } }
+
+/* ═══════════════════════════════════════════
+   UTILITY CLASSES (supplement Tailwind)
+═══════════════════════════════════════════ */
+.mono          { font-family: var(--mono); }
+.glass         { background: rgba(12, 21, 38, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.card          { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); }
+.card-lg       { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.panel         { background: var(--panel); border: 1px solid var(--border); }
+
+.anim-fadein   { animation: fadein 0.2s ease; }
+.anim-slideup  { animation: slideup 0.3s ease; }
+.anim-pulse    { animation: pulse 2s infinite; }
+
+/* ═══════════════════════════════════════════
+   FORM ELEMENTS
+═══════════════════════════════════════════ */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea {
+  background:    var(--card);
+  border:        1px solid var(--border);
+  border-radius: 6px;
+  color:         var(--t1);
+  font-family:   var(--sans);
+  font-size:     13px;
+  outline:       none;
+  transition:    border-color 0.15s;
+}
+input:focus, textarea:focus { border-color: var(--borderhi); }
+input::placeholder, textarea::placeholder { color: var(--t3); }
+
+input[type="range"] {
+  height:       3px;
+  accent-color: var(--blue);
+  cursor:       pointer;
+}
+
+button {
+  cursor:      pointer;
+  font-family: var(--sans);
+  transition:  all 0.15s;
+}
+button:disabled { opacity: 0.4; cursor: not-allowed; }

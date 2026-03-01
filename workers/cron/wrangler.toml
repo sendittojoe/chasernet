@@ -1,0 +1,21 @@
+name               = "chasernet-cron"
+main               = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# ── Cron schedule ─────────────────────────────────
+[triggers]
+crons = ["*/15 * * * *"]   # every 15 minutes
+
+# ── D1 Database ───────────────────────────────────
+[[d1_databases]]
+binding       = "DB"
+database_name = "chasernet-db"
+database_id   = "REPLACE_WITH_YOUR_D1_ID"   # same ID as API worker
+
+# ── KV Namespace ──────────────────────────────────
+[[kv_namespaces]]
+binding = "KV"
+id      = "REPLACE_WITH_YOUR_KV_ID"
+
+[dev]
+port = 8789
