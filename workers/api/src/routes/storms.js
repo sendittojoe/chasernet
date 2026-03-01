@@ -39,3 +39,11 @@ storms.post('/', requireAuth, async (c) => {
   return c.json({ id }, 201)
 })
 export default storms
+
+storms.delete('/:id', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (!['owner','admin'].includes(user.role)) return c.json({ error: 'Forbidden' }, 403)
+  const db = getDB(c.env.DB)
+  await db.run('UPDATE storms SET active = 0 WHERE id = ?', [c.req.param('id')])
+  return c.json({ ok: true })
+})

@@ -31,7 +31,6 @@ export default function NavRail() {
       flexShrink:  0,
     }}>
 
-      {/* Logo */}
       <div style={{
         width:56-20, height:36, borderRadius:10,
         background: 'linear-gradient(135deg, var(--blue) 0%, #6366F1 100%)',
@@ -41,7 +40,6 @@ export default function NavRail() {
         ⚡
       </div>
 
-      {/* Storm room buttons */}
       {rooms.map(room => (
         <RoomButton
           key={room.id}
@@ -53,19 +51,15 @@ export default function NavRail() {
 
       <div style={{ width:28, height:1, background:'var(--border)', margin:'2px 0' }} />
 
-      {/* Discovery */}
-      <RailIcon
-        label="Discovery Feed"
-        active={!activeRoom}
-        onClick={goToDiscovery}
-      >🌐</RailIcon>
-
-      {/* Direct Messages */}
+      <RailIcon label="Discovery Feed" active={!activeRoom} onClick={goToDiscovery}>🌐</RailIcon>
       <RailIcon label="Direct Messages" badge={3}>💬</RailIcon>
 
       <div style={{ flex:1 }} />
 
-      {/* Profile avatar */}
+      {(user?.role === 'admin' || user?.role === 'owner') && (
+        <RailIcon label="Admin Panel" onClick={() => navigate('/app/admin')}>⚙️</RailIcon>
+      )}
+
       <div
         onClick={() => navigate(`/app/profile/${user?.username}`)}
         style={{
@@ -107,8 +101,6 @@ function RoomButton({ room, active, onClick }) {
       }}
     >
       {room.short}
-
-      {/* Live dot */}
       {room.active && (
         <div style={{
           position:  'absolute', top:-3, right:-3,
@@ -118,8 +110,6 @@ function RoomButton({ room, active, onClick }) {
           animation: 'pulse 2s infinite',
         }}/>
       )}
-
-      {/* Category badge */}
       <div style={{
         position:   'absolute', bottom:-5, right:-5,
         minWidth:   18, height:14, borderRadius:4,
