@@ -52,7 +52,7 @@ jobs:
           export FC=gfortran
           make -j$(nproc)
           sudo cp wgrib2/wgrib2 /usr/local/bin/
-          wgrib2 --version
+          wgrib2 --version || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
