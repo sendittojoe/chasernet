@@ -112,18 +112,18 @@ def wgrib2_csv_extract(grib_path, match_str):
         csv_size = os.path.getsize(csv_path)
         print(f"    CSV for {match_str}: {csv_size} bytes")
 
-        # Parse CSV: format is "date","variable","level","lon","lat","value"
+        # Parse CSV: wgrib2 format is "start","end","var","level",lon,lat,value (7 cols)
         grid = {}
         count = 0
         with open(csv_path, 'r') as f:
             for line in f:
                 parts = line.strip().split(',')
-                if len(parts) < 6:
+                if len(parts) < 7:
                     continue
                 try:
-                    lon = float(parts[3].strip('"'))
-                    lat = float(parts[4].strip('"'))
-                    val = float(parts[5].strip('"'))
+                    lon = float(parts[4].strip('"'))
+                    lat = float(parts[5].strip('"'))
+                    val = float(parts[6].strip('"'))
 
                     # Snap to 1° grid
                     ilat = round(lat)
