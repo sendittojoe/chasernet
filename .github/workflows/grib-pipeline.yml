@@ -1,0 +1,169 @@
+# ═══════════════════════════════════════════════════════
+# ChaserNet GRIB2 Pipeline
+#
+# Downloads weather model data from NOAA NOMADS + ECMWF,
+# processes with wgrib2 + Python, uploads JSON grids to R2.
+#
+# Runs every 6 hours aligned with major model cycles.
+# Also triggers when cron worker detects a new run (via workflow_dispatch).
+# ═══════════════════════════════════════════════════════
+
+name: GRIB2 Pipeline
+
+on:
+  schedule:
+    # Run at :30 past to give models time to finish uploading
+    - cron: '30 3,9,15,21 * * *'    # ~30min after 00z/06z/12z/18z
+
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Model to process (gfs, ecmwf, icon, all)'
+        required: true
+        default: 'all'
+      cycle:
+        description: 'Cycle (00z, 06z, 12z, 18z, auto)'
+        required: true
+        default: 'auto'
+
+env:
+  R2_BUCKET: chasernet-assets
+  R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+  R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+  R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wgrib2
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wgrib2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python deps
+        run: pip install numpy boto3
+
+      - name: Install rclone (for R2 uploads)
+        run: |
+          curl -O https://downloads.rclone.org/current/rclone-current-linux-amd64.deb
+          sudo dpkg -i rclone-current-linux-amd64.deb
+
+      - name: Configure rclone for R2
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${R2_ACCESS_KEY}
+          secret_access_key = ${R2_SECRET_KEY}
+          endpoint = ${R2_ENDPOINT}
+          acl = private
+          no_check_bucket = true
+          EOF
+
+      - name: Determine cycle
+        id: cycle
+        run: |
+          if [ "${{ github.event.inputs.cycle }}" = "auto" ] || [ -z "${{ github.event.inputs.cycle }}" ]; then
+            HOUR=$(date -u +%H)
+            if   [ $HOUR -ge 21 ] || [ $HOUR -lt 3 ];  then CYCLE="18z"; RUN_HOUR="18"
+            elif [ $HOUR -ge 15 ]; then CYCLE="12z"; RUN_HOUR="12"
+            elif [ $HOUR -ge 9 ];  then CYCLE="06z"; RUN_HOUR="06"
+            else                        CYCLE="00z"; RUN_HOUR="00"
+            fi
+          else
+            CYCLE="${{ github.event.inputs.cycle }}"
+            RUN_HOUR="${CYCLE%z}"
+          fi
+          DATE=$(date -u +%Y%m%d)
+          echo "cycle=$CYCLE" >> $GITHUB_OUTPUT
+          echo "run_hour=$RUN_HOUR" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+          echo "Processing: $DATE $CYCLE"
+
+      - name: Process GFS
+        if: ${{ github.event.inputs.model == 'gfs' || github.event.inputs.model == 'all' || github.event.inputs.model == '' }}
+        run: |
+          python pipeline/process_grib.py \
+            --model gfs \
+            --date ${{ steps.cycle.outputs.date }} \
+            --cycle ${{ steps.cycle.outputs.run_hour }} \
+            --output /tmp/tiles
+        env:
+          PYTHONUNBUFFERED: "1"
+
+      - name: Process ECMWF
+        if: ${{ github.event.inputs.model == 'ecmwf' || github.event.inputs.model == 'all' || github.event.inputs.model == '' }}
+        run: |
+          # ECMWF only runs 00z and 12z
+          HOUR=${{ steps.cycle.outputs.run_hour }}
+          if [ "$HOUR" = "00" ] || [ "$HOUR" = "12" ]; then
+            python pipeline/process_grib.py \
+              --model ecmwf \
+              --date ${{ steps.cycle.outputs.date }} \
+              --cycle ${{ steps.cycle.outputs.run_hour }} \
+              --output /tmp/tiles
+          else
+            echo "Skipping ECMWF — only runs at 00z/12z"
+          fi
+
+      - name: Process ICON
+        if: ${{ github.event.inputs.model == 'icon' || github.event.inputs.model == 'all' || github.event.inputs.model == '' }}
+        run: |
+          python pipeline/process_grib.py \
+            --model icon \
+            --date ${{ steps.cycle.outputs.date }} \
+            --cycle ${{ steps.cycle.outputs.run_hour }} \
+            --output /tmp/tiles
+        continue-on-error: true
+
+      - name: List generated tiles
+        run: |
+          echo "Generated tiles:"
+          find /tmp/tiles -name "*.json" | head -50
+          echo "Total files: $(find /tmp/tiles -name '*.json' | wc -l)"
+          echo "Total size: $(du -sh /tmp/tiles 2>/dev/null | cut -f1)"
+
+      - name: Upload to R2
+        run: |
+          rclone copy /tmp/tiles/ r2:${R2_BUCKET}/tiles/ \
+            --s3-no-check-bucket \
+            --transfers 16 \
+            --checkers 32 \
+            --contention-limit 100 \
+            --s3-upload-concurrency 16 \
+            --metadata-set "Content-Type=application/json" \
+            --metadata-set "Content-Encoding=gzip" \
+            --metadata-set "Cache-Control=public, max-age=3600" \
+            -v
+
+      - name: Update tile index
+        run: |
+          python pipeline/update_index.py \
+            --date ${{ steps.cycle.outputs.date }} \
+            --cycle ${{ steps.cycle.outputs.run_hour }} \
+            --output /tmp/tile-index.json
+          rclone copyto /tmp/tile-index.json r2:${R2_BUCKET}/tiles/index.json \
+            --s3-no-check-bucket \
+            --metadata-set "Content-Type=application/json" \
+            --metadata-set "Cache-Control=public, max-age=300"
+
+      - name: Notify API of new tiles
+        run: |
+          curl -s -X POST "https://api.chasernet.com/tiles/refresh" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"date":"${{ steps.cycle.outputs.date }}","cycle":"${{ steps.cycle.outputs.cycle }}"}' \
+            || echo "API notify failed (non-fatal)"
