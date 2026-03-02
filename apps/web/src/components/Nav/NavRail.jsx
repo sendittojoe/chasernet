@@ -1,6 +1,8 @@
 import { useNavigate, useLocation }  from 'react-router-dom'
 import { useRoomStore } from '../../stores/roomStore.js'
 import { useUserStore } from '../../stores/userStore.js'
+import { useDMStore }   from '../../hooks/usePresence.js'
+import { useNotificationStore } from '../../stores/notificationStore.js'
 
 const ROLE_COLORS = {
   owner:'#F59E0B', co_creator:'#F59E0B', admin:'#EF4444',
@@ -11,6 +13,8 @@ const ROLE_COLORS = {
 export default function NavRail() {
   const { rooms, activeRoom, setActiveRoom } = useRoomStore()
   const { user, logout }  = useUserStore()
+  const dmUnread           = useDMStore(s => s.totalUnread)
+  const notifUnread        = useNotificationStore(s => s.unread)
   const navigate          = useNavigate()
   const location          = useLocation()
 
@@ -61,12 +65,32 @@ export default function NavRail() {
       </RailIcon>
 
       {/* Direct Messages */}
-      <RailIcon label="Direct Messages" badge={3}>💬</RailIcon>
+      <RailIcon
+        label="Direct Messages"
+        badge={dmUnread || undefined}
+        active={location.pathname.startsWith('/app/messages')}
+        onClick={() => navigate('/app/messages')}
+      >💬</RailIcon>
+      <RailIcon
+        label="Members"
+        active={location.pathname === '/app/members'}
+        onClick={() => navigate('/app/members')}
+      >👥</RailIcon>
 
       {/* Forums */}
-      <RailIcon label="Forums">📋</RailIcon>
+      <RailIcon
+        label="Forums"
+        active={location.pathname.startsWith('/app/forums')}
+        onClick={() => navigate('/app/forums')}
+      >📋</RailIcon>
 
       <div style={{ flex:1 }} />
+
+      {/* Notifications */}
+      <RailIcon
+        label="Notifications"
+        badge={notifUnread || undefined}
+      >🔔</RailIcon>
 
       <Divider />
 

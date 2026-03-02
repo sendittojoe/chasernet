@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useModelFreshness } from '../../hooks/useModelFreshness.js'
 import { useMapStore, ALL_MODELS, ALL_LAYERS } from '../../stores/mapStore.js'
 
 export default function MapControlBar() {
@@ -85,6 +86,7 @@ function LayersPanel() {
 }
 
 function ModelsPanel() {
+  const freshness = useModelFreshness(['gfs','ecmwf','hrrr','nam','icon','gefs','cmc','aifs'])
   const { activeModels, primaryModel, toggleModel, setPrimaryModel, modelData } = useMapStore()
   return (
     <div style={{padding:'8px 12px 14px'}}>

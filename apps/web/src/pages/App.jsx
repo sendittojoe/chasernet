@@ -8,6 +8,7 @@ import AdminPanel  from './AdminPanel.jsx'
 import Onboarding      from './Onboarding.jsx'
 import Forums          from './Forums.jsx'
 import DirectMessages  from './DirectMessages.jsx'
+import Members         from './Members.jsx'
 import NotFound    from './NotFound.jsx'
 import { useUserStore } from '../stores/userStore.js'
 
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="forums/:channelId"       element={<Forums />} />
           <Route path="messages"                element={<DirectMessages />} />
           <Route path="messages/:userId"        element={<DirectMessages />} />
+          <Route path="members"                 element={<Members />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

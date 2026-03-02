@@ -12,6 +12,8 @@ import messages          from './routes/messages.js'
 import notifications     from './routes/notifications.js'
 import discord           from './routes/discord.js'
 import proxy             from './routes/proxy.js'
+import dm                from './routes/dm.js'
+import tiles             from './routes/tiles.js'
 
 const app = new Hono()
 
@@ -39,6 +41,8 @@ app.route('/messages',      messages)
 app.route('/notifications', notifications)
 app.route('/discord',       discord)
 app.route('/proxy',         proxy)
+app.route('/dm',            dm)
+app.route('/tiles',         tiles)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
 app.onError((err, c) => {

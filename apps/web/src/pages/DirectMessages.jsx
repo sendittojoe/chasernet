@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useUserStore } from '../stores/userStore.js'
+import { useDMStore, useDirectMessages } from '../hooks/usePresence.js'
 
 const ROLE_COLORS = {
   owner:'#F59E0B', co_creator:'#F59E0B', admin:'#EF4444',
@@ -8,56 +10,61 @@ const ROLE_COLORS = {
   advanced:'#8B5CF6', enthusiast:'#38BDF8',
 }
 
-const MOCK_CONVOS = [
-  { id:'wx_mike',       username:'wx_mike',       role:'verified',   unread:2,  lastMsg:'Agreed on the Euro track  -  see my latest analysis thread', time:'3m ago',   online:true  },
-  { id:'met_sarah',     username:'met_sarah',      role:'pro',        unread:0,  lastMsg:'Thanks for the CAPE overlay tip!',                         time:'1h ago',   online:true  },
-  { id:'stormchaser_tx',username:'stormchaser_tx', role:'contributor',unread:1,  lastMsg:'You coming to the Panhandle chase next week?',              time:'2h ago',   online:false },
-  { id:'tropics_watch', username:'tropics_watch',  role:'enthusiast', unread:0,  lastMsg:'96W looking more organized on latest SAT IR',              time:'5h ago',   online:true  },
-  { id:'ensemble_guy',  username:'ensemble_guy',   role:'member',     unread:0,  lastMsg:'That GEFS spaghetti plot was wild',                        time:'1d ago',   online:false },
-]
-
-const MOCK_MESSAGES = {
-  wx_mike: [
-    { id:1, from:'wx_mike',  body:'Hey, saw your post in the tropical channel. Good catch on the 850mb anomaly.',       time:'10:14 AM' },
-    { id:2, from:'me',       body:'Thanks! I have been watching that for a few runs. Euro keeps insisting on it.',        time:'10:16 AM' },
-    { id:3, from:'wx_mike',  body:'Agreed on the Euro track  -  see my latest analysis thread. I break down why I trust it this cycle.', time:'10:22 AM' },
-    { id:4, from:'wx_mike',  body:'Also  -  are you submitting a forecast for the Beatriz battle? Window closes in 14h.', time:'10:23 AM' },
-  ],
-  met_sarah: [
-    { id:1, from:'met_sarah', body:'Hey! Quick question  -  how do you get the CAPE overlay to show up on the 850mb level? Not seeing it.', time:'Yesterday' },
-    { id:2, from:'me',        body:'Go to LAYERS > CAPE, then hit the 850 button in the LEVEL section. It should pull 850hPa CAPE from Open-Meteo.', time:'Yesterday' },
-    { id:3, from:'met_sarah', body:'Thanks for the CAPE overlay tip!', time:'Yesterday' },
-  ],
-  stormchaser_tx: [
-    { id:1, from:'stormchaser_tx', body:'You coming to the Panhandle chase next week?', time:'2h ago' },
-  ],
-}
-
 export default function DirectMessages() {
-  const { user } = useUserStore()
-  const [activeConvo, setActiveConvo] = useState('wx_mike')
-  const [messages, setMessages] = useState(MOCK_MESSAGES)
-  const [input, setInput]       = useState('')
-  const [search, setSearch]     = useState('')
+  const { userId: routePartnerId } = useParams()
+  const navigate = useNavigate()
+  const { user }  = useUserStore()
+
+  // Store state
+  const conversations  = useDMStore(s => s.conversations)
+  const activeMessages = useDMStore(s => s.activeMessages)
+  const loading        = useDMStore(s => s.loading)
+
+  // Active conversation
+  const [activeConvo, setActiveConvo] = useState(routePartnerId ?? null)
+  const [input, setInput]   = useState('')
+  const [search, setSearch] = useState('')
   const bottomRef = useRef(null)
 
-  const convos  = MOCK_CONVOS.filter(c => !search || c.username.toLowerCase().includes(search.toLowerCase()))
-  const current = MOCK_CONVOS.find(c => c.id === activeConvo)
-  const msgs    = messages[activeConvo] ?? []
+  const { fetchMessages, fetchConversations, send } = useDirectMessages(activeConvo)
 
+  // Sync route param
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior:'smooth' })
-  }, [activeConvo, messages])
+    if (routePartnerId && routePartnerId !== activeConvo) {
+      setActiveConvo(routePartnerId)
+    }
+  }, [routePartnerId])
 
-  function send() {
+  // Fetch conversations on mount
+  useEffect(() => { fetchConversations() }, [fetchConversations])
+
+  // Fetch messages when active convo changes
+  useEffect(() => {
+    if (activeConvo) fetchMessages()
+  }, [activeConvo, fetchMessages])
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [activeConvo, activeMessages[activeConvo]?.length])
+
+  const filteredConvos = conversations.filter(c =>
+    !search || c.partnerUsername?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const current = conversations.find(c => c.partnerId === activeConvo)
+  const msgs    = activeMessages[activeConvo] ?? []
+
+  async function handleSend() {
     if (!input.trim()) return
-    setMessages(m => ({
-      ...m,
-      [activeConvo]: [...(m[activeConvo] ?? []), {
-        id: Date.now(), from:'me', body: input.trim(), time:'just now',
-      }]
-    }))
-    setInput('')
+    const ok = await send(input)
+    if (ok) setInput('')
+  }
+
+  function selectConvo(partnerId) {
+    setActiveConvo(partnerId)
+    useDMStore.getState().markRead(partnerId)
+    navigate('/app/messages/' + partnerId, { replace: true })
   }
 
   return (
@@ -90,18 +97,23 @@ export default function DirectMessages() {
         </div>
 
         <div style={{ flex:1, overflowY:'auto' }}>
-          {convos.map(c => {
-            const active = activeConvo === c.id
-            const color  = ROLE_COLORS[c.role] ?? '#6B7280'
+          {filteredConvos.length === 0 && (
+            <div style={{ padding:20, textAlign:'center', color:'var(--t3)', fontSize:11 }}>
+              {conversations.length === 0 ? 'No conversations yet' : 'No matches'}
+            </div>
+          )}
+
+          {filteredConvos.map(c => {
+            const active = activeConvo === c.partnerId
+            const color  = c.partnerColor ?? ROLE_COLORS[c.partnerRole] ?? '#6B7280'
             return (
-              <div key={c.id} onClick={() => setActiveConvo(c.id)} style={{
+              <div key={c.partnerId} onClick={() => selectConvo(c.partnerId)} style={{
                 padding:'10px 14px', cursor:'pointer',
                 background: active ? 'rgba(56,189,248,0.08)' : 'transparent',
                 borderLeft: active ? '2px solid #38BDF8' : '2px solid transparent',
                 display:'flex', gap:10, alignItems:'center',
                 transition:'all 0.12s',
               }}>
-                {/* Avatar */}
                 <div style={{ position:'relative', flexShrink:0 }}>
                   <div style={{
                     width:36, height:36, borderRadius:10,
@@ -110,9 +122,9 @@ export default function DirectMessages() {
                     display:'flex', alignItems:'center', justifyContent:'center',
                     fontSize:13, fontWeight:800, color,
                   }}>
-                    {c.username[0].toUpperCase()}
+                    {(c.partnerUsername ?? '?')[0].toUpperCase()}
                   </div>
-                  {c.online && (
+                  {c.partnerOnline && (
                     <div style={{
                       position:'absolute', bottom:-1, right:-1,
                       width:9, height:9, borderRadius:'50%',
@@ -120,38 +132,37 @@ export default function DirectMessages() {
                     }}/>
                   )}
                 </div>
-                {/* Info */}
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                     <span style={{ fontSize:12, fontWeight: c.unread ? 800 : 600, color: active ? '#38BDF8' : 'var(--t1)' }}>
-                      @{c.username}
+                      @{c.partnerUsername}
                     </span>
-                    <span style={{ fontSize:9, color:'var(--t3)' }}>{c.time}</span>
+                    <span style={{ fontSize:9, color:'var(--t3)' }}>
+                      {c.lastMessageAt ? timeAgo(c.lastMessageAt) : ''}
+                    </span>
                   </div>
                   <div style={{
                     fontSize:10, color:'var(--t3)',
                     whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
                     fontWeight: c.unread ? 600 : 400,
                   }}>
-                    {c.lastMsg}
+                    {c.lastMessage}
                   </div>
                 </div>
-                {/* Unread badge */}
                 {c.unread > 0 && (
                   <div style={{
-                    width:16, height:16, borderRadius:'50%',
+                    minWidth:16, height:16, borderRadius:'50%',
                     background:'var(--red)', fontSize:9, fontWeight:700,
                     color:'white', display:'flex', alignItems:'center', justifyContent:'center',
-                    flexShrink:0,
+                    flexShrink:0, padding:'0 3px',
                   }}>{c.unread}</div>
                 )}
               </div>
             )
           })}
 
-          {/* New DM button */}
           <div style={{ padding:'10px 14px' }}>
-            <button style={{
+            <button onClick={() => navigate('/app/members')} style={{
               width:'100%', padding:'8px', borderRadius:7,
               border:'1px dashed rgba(255,255,255,0.15)',
               background:'transparent', color:'var(--t3)', cursor:'pointer',
@@ -166,6 +177,13 @@ export default function DirectMessages() {
       {/* -- Chat Window ------------------------ */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
+        {!activeConvo && (
+          <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8 }}>
+            <div style={{ fontSize:28, opacity:0.3 }}>💬</div>
+            <div style={{ fontSize:12, color:'var(--t3)' }}>Select a conversation</div>
+          </div>
+        )}
+
         {/* Header */}
         {current && (
           <div style={{
@@ -175,92 +193,113 @@ export default function DirectMessages() {
             <div style={{ position:'relative' }}>
               <div style={{
                 width:38, height:38, borderRadius:10,
-                background:(ROLE_COLORS[current.role]??'#6B7280')+'25',
-                border:'1.5px solid '+(ROLE_COLORS[current.role]??'#6B7280'),
+                background:(current.partnerColor ?? '#6B7280') + '25',
+                border:'1.5px solid ' + (current.partnerColor ?? '#6B7280'),
                 display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:15, fontWeight:800, color:ROLE_COLORS[current.role]??'#6B7280',
+                fontSize:15, fontWeight:800, color: current.partnerColor ?? '#6B7280',
               }}>
-                {current.username[0].toUpperCase()}
+                {(current.partnerUsername ?? '?')[0].toUpperCase()}
               </div>
-              {current.online && (
+              {current.partnerOnline && (
                 <div style={{ position:'absolute', bottom:-1, right:-1, width:10, height:10, borderRadius:'50%', background:'#22C55E', border:'2px solid var(--panel)' }}/>
               )}
             </div>
             <div>
-              <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)' }}>@{current.username}</div>
-              <div style={{ fontSize:10, color: current.online ? '#22C55E' : 'var(--t3)' }}>
-                {current.online ? '* Online' : 'o Offline'}
+              <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)' }}>@{current.partnerUsername}</div>
+              <div style={{ fontSize:10, color: current.partnerOnline ? '#22C55E' : 'var(--t3)' }}>
+                {current.partnerOnline ? '● Online' : '○ Offline'}
               </div>
             </div>
             <div style={{ flex:1 }}/>
-            <button style={{ background:'none', border:'1px solid var(--border)', borderRadius:6, color:'var(--t2)', cursor:'pointer', padding:'5px 10px', fontFamily:'var(--mono)', fontSize:10 }}>
+            <button
+              onClick={() => navigate('/app/profile/' + current.partnerUsername)}
+              style={{ background:'none', border:'1px solid var(--border)', borderRadius:6, color:'var(--t2)', cursor:'pointer', padding:'5px 10px', fontFamily:'var(--mono)', fontSize:10 }}
+            >
               View Profile
             </button>
           </div>
         )}
 
         {/* Messages */}
-        <div style={{ flex:1, overflowY:'auto', padding:'16px 20px', display:'flex', flexDirection:'column', gap:10 }}>
-          {msgs.map((msg, i) => {
-            const isMe = msg.from === 'me'
-            const color = isMe ? 'var(--blue)' : (ROLE_COLORS[current?.role] ?? '#6B7280')
-            const showAvatar = !isMe && (i === 0 || msgs[i-1]?.from !== msg.from)
-            return (
-              <div key={msg.id} style={{
-                display:'flex', gap:10,
-                flexDirection: isMe ? 'row-reverse' : 'row',
-                alignItems:'flex-end',
-              }}>
-                {!isMe && (
-                  <div style={{
-                    width:28, height:28, borderRadius:8, flexShrink:0,
-                    background: showAvatar ? color+'25' : 'transparent',
-                    border: showAvatar ? '1px solid '+color : 'none',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    fontSize:11, fontWeight:800, color,
+        {activeConvo && (
+          <>
+            <div style={{ flex:1, overflowY:'auto', padding:'16px 20px', display:'flex', flexDirection:'column', gap:10 }}>
+              {loading && msgs.length === 0 && (
+                <div style={{ textAlign:'center', color:'var(--t3)', fontSize:11, padding:20 }}>Loading...</div>
+              )}
+              {msgs.map((msg, i) => {
+                const isMe = msg.from_id === user?.id
+                const color = isMe ? 'var(--blue)' : (current?.partnerColor ?? '#6B7280')
+                const showAvatar = !isMe && (i === 0 || msgs[i-1]?.from_id !== msg.from_id)
+                return (
+                  <div key={msg.id} style={{
+                    display:'flex', gap:10,
+                    flexDirection: isMe ? 'row-reverse' : 'row',
+                    alignItems:'flex-end',
                   }}>
-                    {showAvatar ? current?.username[0].toUpperCase() : ''}
+                    {!isMe && (
+                      <div style={{
+                        width:28, height:28, borderRadius:8, flexShrink:0,
+                        background: showAvatar ? color+'25' : 'transparent',
+                        border: showAvatar ? '1px solid '+color : 'none',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:11, fontWeight:800, color,
+                      }}>
+                        {showAvatar ? (msg.username ?? '?')[0].toUpperCase() : ''}
+                      </div>
+                    )}
+                    <div style={{
+                      maxWidth:'70%',
+                      padding:'9px 13px', borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
+                      background: isMe ? 'rgba(56,189,248,0.18)' : 'rgba(255,255,255,0.06)',
+                      border: isMe ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <div style={{ fontSize:12, color:'var(--t1)', lineHeight:1.5 }}>{msg.content}</div>
+                      <div style={{ fontSize:9, color:'var(--t3)', marginTop:4, textAlign: isMe ? 'right' : 'left' }}>
+                        {msg.created_at ? timeAgo(msg.created_at) : ''}
+                      </div>
+                    </div>
                   </div>
-                )}
-                <div style={{
-                  maxWidth:'70%',
-                  padding:'9px 13px', borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                  background: isMe ? 'rgba(56,189,248,0.18)' : 'rgba(255,255,255,0.06)',
-                  border: isMe ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                }}>
-                  <div style={{ fontSize:12, color:'var(--t1)', lineHeight:1.5 }}>{msg.body}</div>
-                  <div style={{ fontSize:9, color:'var(--t3)', marginTop:4, textAlign: isMe ? 'right' : 'left' }}>{msg.time}</div>
-                </div>
-              </div>
-            )
-          })}
-          <div ref={bottomRef}/>
-        </div>
+                )
+              })}
+              <div ref={bottomRef}/>
+            </div>
 
-        {/* Input */}
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', flexShrink:0 }}>
-          <div style={{ display:'flex', gap:10, alignItems:'flex-end' }}>
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send() }}}
-              placeholder={'Message @' + (current?.username ?? '') + '... (Enter to send)'}
-              rows={1}
-              style={{
-                flex:1, padding:'10px 12px', borderRadius:8,
-                background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)',
-                color:'var(--t1)', fontFamily:'var(--mono)', fontSize:12,
-                resize:'none', outline:'none', maxHeight:120,
-              }}
-            />
-            <button onClick={send} style={{
-              padding:'10px 16px', borderRadius:8, border:'none', cursor:'pointer',
-              background:'var(--blue)', color:'var(--bg)',
-              fontFamily:'var(--mono)', fontWeight:800, fontSize:12, flexShrink:0,
-            }}>-></button>
-          </div>
-        </div>
+            {/* Input */}
+            <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', flexShrink:0 }}>
+              <div style={{ display:'flex', gap:10, alignItems:'flex-end' }}>
+                <textarea
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); handleSend() }}}
+                  placeholder={'Message @' + (current?.partnerUsername ?? '') + '... (Enter to send)'}
+                  rows={1}
+                  style={{
+                    flex:1, padding:'10px 12px', borderRadius:8,
+                    background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)',
+                    color:'var(--t1)', fontFamily:'var(--mono)', fontSize:12,
+                    resize:'none', outline:'none', maxHeight:120, boxSizing:'border-box',
+                  }}
+                />
+                <button onClick={handleSend} style={{
+                  padding:'10px 16px', borderRadius:8, border:'none', cursor:'pointer',
+                  background:'var(--blue)', color:'var(--bg)',
+                  fontFamily:'var(--mono)', fontWeight:800, fontSize:12, flexShrink:0,
+                }}>→</button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
+}
+
+function timeAgo(ts) {
+  const diff = Date.now() - ts
+  if (diff < 60000)       return 'just now'
+  if (diff < 3600000)     return Math.floor(diff / 60000) + 'm ago'
+  if (diff < 86400000)    return Math.floor(diff / 3600000) + 'h ago'
+  if (diff < 604800000)   return Math.floor(diff / 86400000) + 'd ago'
+  return new Date(ts).toLocaleDateString()
 }

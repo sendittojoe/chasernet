@@ -30,8 +30,9 @@ id      = "1aee15e72bcf49cfa67255deb4a78707"          # from: wrangler kv:namesp
 
 # ── Environment ──────────────────────────────────
 [vars]
-ENVIRONMENT   = "production"
+ENVIRONMENT    = "production"
 ALLOWED_ORIGIN = "https://chasernet.com"
+CHAT_ORIGIN    = "https://chat.chasernet.com"
 
 [dev]
 port = 8787

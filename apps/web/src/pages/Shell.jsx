@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
+import ShareButton    from '../components/Map/ShareButton.jsx'
+import FreshnessBadges from '../components/Map/FreshnessBadges.jsx'
 import NavRail             from '../components/Nav/NavRail.jsx'
 import ChaserMap           from '../components/Map/ChaserMap.jsx'
 import RightPanel          from '../components/StormRoom/RightPanel.jsx'
 import MobileBottomNav     from '../components/Nav/MobileBottomNav.jsx'
 import { useMapStore }     from '../stores/mapStore.js'
 import { useRoomStore }    from '../stores/roomStore.js'
+import { useStorms }       from '../hooks/useStorms.js'
+import { useModelRuns }    from '../hooks/useModelRuns.js'
+import { usePresence, useDirectMessages } from '../hooks/usePresence.js'
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 768)
@@ -17,10 +23,23 @@ function useIsMobile() {
 }
 
 export default function Shell() {
+  const mapObjRef = { current: null } // shared ref passed to ShareButton
   const { navCollapsed, rightCollapsed, setNavCollapsed, setRightCollapsed } = useMapStore()
   const { activeRoom } = useRoomStore()
   const isMobile = useIsMobile()
   const [mobilePanel, setMobilePanel] = useState(false)
+
+  // Wire up live data feeds
+  useStorms()                    // polls NHC active storms → roomStore
+  const { runs } = useModelRuns() // polls model run status + notifications
+  usePresence()                  // WebSocket for real-time DMs + notifications
+
+  // Fetch DM conversations on mount
+  const { fetchConversations } = useDirectMessages()
+  useEffect(() => { fetchConversations() }, [fetchConversations])
+
+  const location = useLocation()
+  const isMapRoute = location.pathname === '/app' || location.pathname.startsWith('/app/storm')
 
   if (isMobile) {
     return (
@@ -68,6 +87,20 @@ export default function Shell() {
       </div>
       <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, position:'relative' }}>
         <ChaserMap />
+        <ShareButton mapRef={mapObjRef} />
+        {isMapRoute && (
+          <div style={{
+            position:'absolute', bottom:72, left:'50%', transform:'translateX(-50%)',
+            zIndex:35, pointerEvents:'none',
+          }}>
+            <FreshnessBadges />
+          </div>
+        )}
+        {!isMapRoute && (
+          <div style={{ position:'absolute', inset:0, zIndex:30, background:'var(--bg)', overflow:'auto', display:'flex' }}>
+            <Outlet />
+          </div>
+        )}
       </div>
       <div onClick={() => setRightCollapsed(!rightCollapsed)} title={rightCollapsed ? 'Expand panel' : 'Collapse panel'} style={{
         position:'absolute', right: rightCollapsed ? 4 : 324, top:'50%', transform:'translateY(-50%)',

@@ -10,37 +10,8 @@ export const useRoomStore = create((set, get) => ({
   // Active right panel tab
   rightTab: 'live',    // live | analysis | models | battle
 
-  // Rooms list (populated from API in Phase 2, seeded here for Phase 1)
-  rooms: [
-    {
-      id:        'beatriz-2026',
-      name:      'Hurricane Beatriz',
-      short:     'B',
-      category:  'C3',
-      catColor:  '#EF4444',
-      basin:     'EPac',
-      wind:      115,
-      pressure:  950,
-      lat:       16.2,
-      lon:       -104.8,
-      users:     89,
-      active:    true,
-    },
-    {
-      id:        'invest96w-2026',
-      name:      'Invest 96W',
-      short:     '96W',
-      category:  'Invest',
-      catColor:  '#8B5CF6',
-      basin:     'WPac',
-      wind:      35,
-      pressure:  1007,
-      lat:       14.8,
-      lon:       138.2,
-      users:     31,
-      active:    false,
-    },
-  ],
+  // Rooms list — populated from live NHC data via useStorms() hook
+  rooms: [],
 
   // ── Actions ──────────────────────────────────────
   setActiveRoom: (id)  => set({ activeRoom: id, rightTab: 'live' }),

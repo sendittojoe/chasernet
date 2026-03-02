@@ -11,9 +11,17 @@ routes = [
 name       = "STORM_ROOM"
 class_name = "StormRoomDO"
 
+[[durable_objects.bindings]]
+name       = "USER_PRESENCE"
+class_name = "UserPresenceDO"
+
 [[migrations]]
 tag                  = "v1"
 new_classes          = ["StormRoomDO"]
+
+[[migrations]]
+tag                  = "v2"
+new_classes          = ["UserPresenceDO"]
 
 [dev]
 port = 8788

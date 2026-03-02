@@ -1,4 +1,5 @@
 import { useRoomStore } from '../../stores/roomStore.js'
+import OnlinePresence from './OnlinePresence.jsx'
 import DiscoveryFeed   from '../Community/DiscoveryFeed.jsx'
 import LiveTab         from './tabs/LiveTab.jsx'
 import AnalysisTab     from './tabs/AnalysisTab.jsx'
