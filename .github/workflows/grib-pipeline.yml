@@ -103,6 +103,23 @@ jobs:
           echo "date=$DATE" >> $GITHUB_OUTPUT
           echo "Processing: $DATE $CYCLE"
 
+      - name: Debug - list GRIB2 fields
+        run: |
+          DATE=${{ steps.cycle.outputs.date }}
+          CYCLE=${{ steps.cycle.outputs.run_hour }}
+          URL="https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.${DATE}/${CYCLE}/atmos/gfs.t${CYCLE}z.pgrb2.1p00.f000"
+          echo "Downloading sample: $URL"
+          wget -q "$URL" -O /tmp/sample.grib2 || echo "Download failed"
+          echo "=== First 30 fields ==="
+          wgrib2 /tmp/sample.grib2 | head -30 || true
+          echo "=== Searching for TMP ==="
+          wgrib2 /tmp/sample.grib2 -match "TMP" | head -5 || true
+          echo "=== Searching for UGRD ==="
+          wgrib2 /tmp/sample.grib2 -match "UGRD" | head -5 || true
+          echo "=== Searching for PRMSL ==="
+          wgrib2 /tmp/sample.grib2 -match "PRMSL" | head -5 || true
+          rm -f /tmp/sample.grib2
+
       - name: Process GFS
         if: ${{ github.event.inputs.model == 'gfs' || github.event.inputs.model == 'all' || github.event.inputs.model == '' }}
         run: |

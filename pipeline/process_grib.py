@@ -96,17 +96,21 @@ def wgrib2_csv_extract(grib_path, match_str):
         csv_path = tmp.name
 
     try:
-        cmd = ['wgrib2', grib_path, '-match', match_str, '-csv', csv_path]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        cmd = f'wgrib2 {grib_path} -match "{match_str}" -csv {csv_path}'
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
 
-        if result.returncode != 0:
-            # wgrib2 returns non-zero sometimes even on partial success
-            if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
-                print(f"    wgrib2 no match for: {match_str}")
-                return None
+        if result.stderr:
+            # Print first line of stderr for debugging
+            err_lines = result.stderr.strip().split('\n')
+            for el in err_lines[:3]:
+                print(f"    [wgrib2] {el}")
 
-        if os.path.getsize(csv_path) == 0:
+        if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
+            print(f"    ✗ no data for: {match_str}")
             return None
+
+        csv_size = os.path.getsize(csv_path)
+        print(f"    CSV for {match_str}: {csv_size} bytes")
 
         # Parse CSV: format is "date","variable","level","lon","lat","value"
         grid = {}
