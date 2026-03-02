@@ -120,19 +120,20 @@ jobs:
           wgrib2 /tmp/sample.grib2 -match "PRMSL" | head -5 || true
           rm -f /tmp/sample.grib2
 
-      - name: Process GFS
-        if: ${{ github.event.inputs.model == 'gfs' || github.event.inputs.model == 'all' || github.event.inputs.model == '' }}
+      - name: Process models
         run: |
+          MODEL="${{ github.event.inputs.model }}"
+          MODEL=${MODEL:-all}
           python pipeline/process_grib.py \
-            --model gfs \
+            --model $MODEL \
             --date ${{ steps.cycle.outputs.date }} \
             --cycle ${{ steps.cycle.outputs.run_hour }} \
             --output /tmp/tiles
         env:
           PYTHONUNBUFFERED: "1"
 
-      - name: Process ECMWF
-        if: ${{ github.event.inputs.model == 'ecmwf' || github.event.inputs.model == 'all' || github.event.inputs.model == '' }}
+      - name: Process ECMWF (skip)
+        if: false
         run: |
           # ECMWF only runs 00z and 12z
           HOUR=${{ steps.cycle.outputs.run_hour }}
@@ -146,8 +147,8 @@ jobs:
             echo "Skipping ECMWF — only runs at 00z/12z"
           fi
 
-      - name: Process ICON
-        if: ${{ github.event.inputs.model == 'icon' || github.event.inputs.model == 'all' || github.event.inputs.model == '' }}
+      - name: Process ICON (skip)
+        if: false
         run: |
           python pipeline/process_grib.py \
             --model icon \
