@@ -214,6 +214,14 @@ def process_gfs(date, cycle, output_dir):
             if not download(url, grib_path):
                 continue
 
+            # On first file, dump inventory to find exact field names
+            if fhour == 0:
+                inv = subprocess.run(f'wgrib2 {grib_path} | grep -iE "UGRD.*10 m|VGRD.*10 m|TMP.*2 m|PRMSL|CAPE.*surface|HGT.*500 mb|APCP" | head -20',
+                    shell=True, capture_output=True, text=True)
+                print(f"  Matching fields in file:")
+                for line in inv.stdout.strip().split('\n'):
+                    if line: print(f"    {line}")
+
             # Collect grids for each variable group
             groups = defaultdict(dict)
 
