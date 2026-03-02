@@ -43,7 +43,16 @@ jobs:
       - name: Install wgrib2
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq wgrib2
+          sudo apt-get install -y -qq gfortran libpng-dev zlib1g-dev
+          wget -q https://www.ftp.cpc.ncep.noaa.gov/wd51we/wgrib2/wgrib2.tgz.v3.3.0 -O wgrib2.tgz || \
+            wget -q https://www.ftp.cpc.ncep.noaa.gov/wd51we/wgrib2/wgrib2.tgz -O wgrib2.tgz
+          tar xzf wgrib2.tgz
+          cd grib2
+          export CC=gcc
+          export FC=gfortran
+          make -j$(nproc)
+          sudo cp wgrib2/wgrib2 /usr/local/bin/
+          wgrib2 --version
 
       - name: Set up Python
         uses: actions/setup-python@v5
