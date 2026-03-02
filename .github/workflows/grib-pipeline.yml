@@ -150,13 +150,8 @@ jobs:
         run: |
           rclone copy /tmp/tiles/ r2:${R2_BUCKET}/tiles/ \
             --s3-no-check-bucket \
-            --transfers 16 \
-            --checkers 32 \
-            --contention-limit 100 \
-            --s3-upload-concurrency 16 \
-            --metadata-set "Content-Type=application/json" \
-            --metadata-set "Content-Encoding=gzip" \
-            --metadata-set "Cache-Control=public, max-age=3600" \
+            --transfers 8 \
+            --checkers 16 \
             -v
 
       - name: Update tile index
@@ -167,8 +162,7 @@ jobs:
             --output /tmp/tile-index.json
           rclone copyto /tmp/tile-index.json r2:${R2_BUCKET}/tiles/index.json \
             --s3-no-check-bucket \
-            --metadata-set "Content-Type=application/json" \
-            --metadata-set "Cache-Control=public, max-age=300"
+            -v
 
       - name: Notify API of new tiles
         run: |
