@@ -52,12 +52,11 @@ tiles.get('/:model/:date/:cycle/:filename', async (c) => {
       return c.json({ error: 'Tile not found' }, 404)
     }
 
-    const body = await obj.arrayBuffer()
+    const body = await obj.text()
     return new Response(body, {
       headers: {
-        'Content-Type':     'application/json',
-        'Content-Encoding': 'gzip',
-        'Cache-Control':    'public, max-age=3600, stale-while-revalidate=7200',
+        'Content-Type':  'application/json',
+        'Cache-Control':  'public, max-age=3600, stale-while-revalidate=7200',
         'Access-Control-Allow-Origin': '*',
       },
     })

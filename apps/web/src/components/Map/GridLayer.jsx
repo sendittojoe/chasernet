@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useMapStore, ALL_MODELS } from '../../stores/mapStore.js'
 
 const API     = import.meta.env.VITE_API_BASE ?? 'https://api.chasernet.com'
-const R2_BASE = 'https://assets.chasernet.com/tiles'
+const TILE_BASE = `${API}/tiles`
 
 // Color ramps for different variables
 const COLOR_RAMPS = {
@@ -261,7 +261,7 @@ async function fetchTile(model, variable, fhStr) {
     const cycles = model === 'ecmwf' ? ['12', '00'] : ['18', '12', '06', '00']
 
     for (const cycle of cycles) {
-      const url = `${R2_BASE}/${model}/${date}/${cycle}z/${variable}_f${fhStr}.json`
+      const url = `${TILE_BASE}/${model}/${date}/${cycle}z/${variable}_f${fhStr}.json`
       const res = await fetch(url)
       if (res.ok) {
         return await res.json()

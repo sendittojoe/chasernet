@@ -176,17 +176,16 @@ def make_tile(model, date, cycle, fhour, variable, data):
 
 
 def save_tile(tile, path):
-    """Save tile as gzipped JSON."""
+    """Save tile as plain JSON."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     json_str = json.dumps(tile, separators=(',', ':'))
-    compressed = gzip.compress(json_str.encode(), compresslevel=6)
 
-    with open(path, 'wb') as f:
-        f.write(compressed)
+    with open(path, 'w') as f:
+        f.write(json_str)
 
-    size_kb = len(compressed) / 1024
+    size_kb = len(json_str) / 1024
     print(f"  → {path.name} ({size_kb:.0f}KB)")
     return True
 

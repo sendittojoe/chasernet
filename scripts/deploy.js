@@ -53,12 +53,11 @@ if (!webOnly) {
   run(`wrangler deploy ${env}`, resolve(ROOT, 'workers/cron'))
 }
 
-// ── Deploy Chat Worker (Phase 3) ─────────────────────
-// Uncomment when Durable Objects are ready:
-// if (!webOnly) {
-//   console.log('\n💬 Deploying Chat Worker…')
-//   run(`wrangler deploy ${env}`, resolve(ROOT, 'workers/chat'))
-// }
+// ── Deploy Chat Worker ────────────────────────────────
+if (!webOnly) {
+  console.log('\n💬 Deploying Chat Worker…')
+  run(`wrangler deploy ${env}`, resolve(ROOT, 'workers/chat'))
+}
 
 console.log('\n✅ Deploy complete!')
 console.log('   Frontend: https://chasernet.com')
