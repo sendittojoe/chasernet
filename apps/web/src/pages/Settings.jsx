@@ -184,6 +184,69 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Discord */}
+      <div style={sectionStyle}>
+        <h2 style={{ fontSize:14, fontWeight:700, color:'#5865F2', fontFamily:'var(--mono)', marginBottom:16 }}>
+          DISCORD
+        </h2>
+        {user?.discord_id ? (
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+              <div style={{
+                width:36, height:36, borderRadius:'50%', background:'#5865F2',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:16, color:'white', fontWeight:700,
+              }}>
+                {user.discord_username?.[0]?.toUpperCase() ?? 'D'}
+              </div>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>
+                  {user.discord_username ?? 'Connected'}
+                </div>
+                <div style={{ fontSize:10, color:'#5865F2', fontFamily:'var(--mono)' }}>
+                  ✓ Discord linked
+                </div>
+              </div>
+            </div>
+            <button onClick={async () => {
+              try {
+                await fetch(`${API_BASE}/auth/me`, {
+                  method:'PATCH',
+                  headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+                  body:JSON.stringify({ discord_id:null, discord_username:null }),
+                })
+                login({ ...user, discord_id:null, discord_username:null }, token)
+                setMsg('Discord unlinked')
+              } catch { setErr('Failed to unlink') }
+            }} style={{
+              padding:'8px 16px', background:'rgba(88,101,242,0.12)',
+              border:'1px solid rgba(88,101,242,0.3)', borderRadius:6,
+              color:'#5865F2', fontWeight:600, fontSize:11, cursor:'pointer',
+            }}>
+              Unlink Discord
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p style={{ fontSize:12, color:'var(--t2)', marginBottom:12, lineHeight:1.5 }}>
+              Link your Discord account for one-click login, storm alerts in your server,
+              and two-way chat bridging between Discord and ChaserNet storm rooms.
+            </p>
+            <a href={`${API_BASE}/discord/oauth`} style={{
+              display:'inline-flex', alignItems:'center', gap:8,
+              padding:'9px 18px', background:'#5865F2', border:'none',
+              borderRadius:6, color:'#fff', fontWeight:700, fontSize:12,
+              cursor:'pointer', textDecoration:'none',
+            }}>
+              <svg width="16" height="12" viewBox="0 0 71 55" fill="none">
+                <path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.5 37.5 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 4.9a.2.2 0 00-.1.1C1.5 18.7-.9 32.2.3 45.5v.1a58.7 58.7 0 0017.9 9.1.2.2 0 00.3-.1 42 42 0 003.6-5.9.2.2 0 00-.1-.3 38.6 38.6 0 01-5.5-2.7.2.2 0 01.5-.4l1.1.9a42 42 0 0035.8 0l1.1-.9a.2.2 0 01.4.4 36.3 36.3 0 01-5.5 2.7.2.2 0 00-.1.3 47.1 47.1 0 003.6 5.9.2.2 0 00.3.1 58.5 58.5 0 0018-9.1v-.1c1.4-15-2.3-28-9.8-39.6a.2.2 0 00-.1-.1zM23.7 37.3c-3.4 0-6.2-3.1-6.2-7s2.7-7 6.2-7 6.3 3.2 6.2 7-2.8 7-6.2 7zm23 0c-3.4 0-6.2-3.1-6.2-7s2.7-7 6.2-7 6.3 3.2 6.2 7-2.8 7-6.2 7z" fill="white"/>
+              </svg>
+              Connect Discord
+            </a>
+          </div>
+        )}
+      </div>
+
       {/* Danger Zone */}
       <div style={{ ...sectionStyle, borderColor:'rgba(239,68,68,0.3)' }}>
         <h2 style={{ fontSize:14, fontWeight:700, color:'#EF4444', fontFamily:'var(--mono)', marginBottom:16 }}>
