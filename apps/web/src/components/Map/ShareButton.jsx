@@ -16,11 +16,6 @@ export default function ShareButton({ mapRef }) {
       onClick={handle}
       title="Copy shareable map link"
       style={{
-        position: 'absolute',
-        top: 14,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 35,
         padding: '6px 14px',
         borderRadius: 20,
         border: '1px solid rgba(255,255,255,0.15)',

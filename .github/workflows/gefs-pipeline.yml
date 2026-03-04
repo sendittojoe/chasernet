@@ -1,0 +1,59 @@
+name: GEFS Ensemble Pipeline
+
+on:
+  schedule:
+    - cron: '0 4,16 * * *'   # After 00z and 12z GEFS completes (~3h lag)
+  workflow_dispatch:
+    inputs:
+      cycle:
+        description: 'Cycle (00, 12)'
+        required: false
+        default: '00'
+      variable:
+        description: 'Variable'
+        required: false
+        default: 'HGT:500'
+        type: choice
+        options: ['HGT:500', 'PRMSL', 'TMP:2m']
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # Ensemble is large, allow more time
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install wgrib2
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq wgrib2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install boto3
+
+      - name: Process GEFS ensemble
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          CYCLE="${{ inputs.cycle || '00' }}"
+          VAR="${{ inputs.variable || 'HGT:500' }}"
+          python pipeline/process_gefs.py \
+            --date $DATE --cycle $CYCLE \
+            --variable "$VAR" \
+            --output ./tiles-output \
+            --fhours "0,24,48,72,96,120,168"
+
+      - name: Upload to R2
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+        run: python pipeline/upload_to_r2.py ./tiles-output
+
+      - name: Notify API
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -sf -X POST https://api.chasernet.com/tiles/refresh \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"gefs"}' || true

@@ -11,6 +11,7 @@ import { useRoomStore }    from '../stores/roomStore.js'
 import { useStorms }       from '../hooks/useStorms.js'
 import { useModelRuns }    from '../hooks/useModelRuns.js'
 import { usePresence, useDirectMessages } from '../hooks/usePresence.js'
+import CommandPalette      from '../components/Map/CommandPalette.jsx'
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 768)
@@ -23,18 +24,16 @@ function useIsMobile() {
 }
 
 export default function Shell() {
-  const mapObjRef = { current: null } // shared ref passed to ShareButton
-  const { navCollapsed, rightCollapsed, setNavCollapsed, setRightCollapsed } = useMapStore()
+  const mapObjRef = { current: null }
+  const { rightCollapsed, setRightCollapsed } = useMapStore()
   const { activeRoom } = useRoomStore()
   const isMobile = useIsMobile()
   const [mobilePanel, setMobilePanel] = useState(false)
 
-  // Wire up live data feeds
-  useStorms()                    // polls NHC active storms → roomStore
-  const { runs } = useModelRuns() // polls model run status + notifications
-  usePresence()                  // WebSocket for real-time DMs + notifications
+  useStorms()
+  const { runs } = useModelRuns()
+  usePresence()
 
-  // Fetch DM conversations on mount
   const { fetchConversations } = useDirectMessages()
   useEffect(() => { fetchConversations() }, [fetchConversations])
 
@@ -44,8 +43,20 @@ export default function Shell() {
   if (isMobile) {
     return (
       <div style={{ display:'flex', flexDirection:'column', width:'100vw', height:'100dvh', overflow:'hidden', background:'var(--bg)' }}>
+        <CommandPalette />
         <div style={{ flex:1, position:'relative', minHeight:0 }}>
           <ChaserMap />
+          {/* Floating overlays */}
+          {isMapRoute && (
+            <>
+              <div style={{ position:'absolute', top:56, left:10, zIndex:35, pointerEvents:'auto' }}>
+                <ShareButton mapRef={mapObjRef} />
+              </div>
+              <div style={{ position:'absolute', top:56, right:10, zIndex:35, pointerEvents:'auto' }}>
+                <FreshnessBadges />
+              </div>
+            </>
+          )}
         </div>
         {(mobilePanel || activeRoom) && (
           <div style={{
@@ -72,36 +83,35 @@ export default function Shell() {
 
   return (
     <div style={{ display:'flex', width:'100vw', height:'100dvh', overflow:'hidden', background:'var(--bg)' }}>
-      <div style={{ width: navCollapsed ? 0 : 56, overflow:'hidden', transition:'width 0.2s ease', flexShrink:0 }}>
-        <NavRail />
-      </div>
-      <div onClick={() => setNavCollapsed(!navCollapsed)} title={navCollapsed ? 'Expand nav' : 'Collapse nav'} style={{
-        position:'absolute', left: navCollapsed ? 4 : 60, top:'50%', transform:'translateY(-50%)',
-        zIndex:40, width:16, height:48, borderRadius:4,
-        background:'var(--card)', border:'1px solid var(--border)',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        cursor:'pointer', fontSize:12, color:'var(--t3)',
-        transition:'left 0.2s ease',
-      }}>
-        {navCollapsed ? '>' : '<'}
-      </div>
+      <CommandPalette />
+      <NavRail />
+
       <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, position:'relative' }}>
         <ChaserMap />
-        <ShareButton mapRef={mapObjRef} />
+
+        {/* Floating overlays on map */}
         {isMapRoute && (
           <div style={{
-            position:'absolute', bottom:72, left:'50%', transform:'translateX(-50%)',
-            zIndex:35, pointerEvents:'none',
+            position:'absolute', top:56, left:10, right:10, zIndex:35,
+            display:'flex', alignItems:'flex-start', justifyContent:'space-between',
+            pointerEvents:'none',
           }}>
-            <FreshnessBadges />
+            <div style={{ pointerEvents:'auto' }}>
+              <ShareButton mapRef={mapObjRef} />
+            </div>
+            <div style={{ pointerEvents:'auto' }}>
+              <FreshnessBadges />
+            </div>
           </div>
         )}
+
         {!isMapRoute && (
           <div style={{ position:'absolute', inset:0, zIndex:30, background:'var(--bg)', overflow:'auto', display:'flex' }}>
             <Outlet />
           </div>
         )}
       </div>
+
       <div onClick={() => setRightCollapsed(!rightCollapsed)} title={rightCollapsed ? 'Expand panel' : 'Collapse panel'} style={{
         position:'absolute', right: rightCollapsed ? 4 : 324, top:'50%', transform:'translateY(-50%)',
         zIndex:40, width:16, height:48, borderRadius:4,

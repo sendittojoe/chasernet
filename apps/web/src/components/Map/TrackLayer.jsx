@@ -7,41 +7,41 @@ const DOT_PREFIX  = 'track-dot-'
 
 /**
  * TrackLayer — renders model forecast tracks on the MapLibre map.
- *
- * Reads track arrays from mapStore.modelData[modelId].track
- * Each track is [[hour, lat, lon], ...] built by useWeatherData.
- *
- * - Primary model: solid thick line + hour-labeled dots
- * - Other active models: thinner dashed lines (spaghetti-style)
- * - Syncs visibility/opacity with the 'track' layer toggle in store
+ * Only runs when track-relevant state changes.
  */
 export default function TrackLayer({ map }) {
   const drawnRef = useRef(new Set())
 
-  // ── Draw/update tracks whenever model data or active models change ──
   useEffect(() => {
     if (!map) return
 
+    // Only subscribe to state that matters for tracks
     const unsub = useMapStore.subscribe(
       state => ({
         modelData:    state.modelData,
         activeModels: state.activeModels,
         primaryModel: state.primaryModel,
-        activeLayers: state.activeLayers,
+        trackVisible: state.activeLayers.find(l => l.id === 'track')?.visible ?? false,
+        trackOpacity: state.activeLayers.find(l => l.id === 'track')?.opacity ?? 0.85,
         hour:         state.hour,
       }),
-      () => render(map, drawnRef),
+      (curr, prev) => {
+        // Only render if something track-relevant actually changed
+        if (
+          curr.modelData    !== prev.modelData ||
+          curr.activeModels !== prev.activeModels ||
+          curr.primaryModel !== prev.primaryModel ||
+          curr.trackVisible !== prev.trackVisible ||
+          curr.trackOpacity !== prev.trackOpacity ||
+          curr.hour         !== prev.hour
+        ) {
+          safeRender(map, drawnRef)
+        }
+      },
     )
 
     // Initial render
-    const tryRender = () => {
-      if (map.isStyleLoaded()) {
-        render(map, drawnRef)
-      } else {
-        map.once('load', () => render(map, drawnRef))
-      }
-    }
-    tryRender()
+    safeRender(map, drawnRef)
 
     return () => {
       unsub()
@@ -52,8 +52,16 @@ export default function TrackLayer({ map }) {
   return null
 }
 
-// ── Hour markers to label on the track ──
 const LABEL_HOURS = [0, 12, 24, 48, 72, 96, 120, 144, 168]
+
+function safeRender(map, drawnRef) {
+  try {
+    if (!map || !map.getStyle || !map.getStyle()) return
+    render(map, drawnRef)
+  } catch (e) {
+    // Silently ignore — map style may not be fully loaded yet
+  }
+}
 
 function render(map, drawnRef) {
   const { modelData, activeModels, primaryModel, activeLayers, hour } =
@@ -63,7 +71,7 @@ function render(map, drawnRef) {
   const visible    = trackLayer?.visible ?? false
   const opacity    = trackLayer?.opacity ?? 0.85
 
-  // Clean up old layers that are no longer active
+  // Clean up old layers
   for (const id of drawnRef.current) {
     const modelId = id.replace(SRC_PREFIX, '')
     if (!activeModels.includes(modelId) || !modelData?.[modelId]?.track) {
@@ -72,7 +80,9 @@ function render(map, drawnRef) {
     }
   }
 
-  // Draw each active model's track
+  // If track layer isn't visible and nothing is drawn, bail early
+  if (!visible && drawnRef.current.size === 0) return
+
   for (const modelId of activeModels) {
     const track = modelData?.[modelId]?.track
     if (!track || track.length < 2) continue
@@ -85,14 +95,13 @@ function render(map, drawnRef) {
     const lineId = LINE_PREFIX + modelId
     const dotId  = DOT_PREFIX  + modelId
 
-    // Build GeoJSON line
+    // Build GeoJSON
     const coordinates = track.map(([, lat, lon]) => [lon, lat])
     const lineGeoJSON = {
       type: 'Feature',
       geometry: { type: 'LineString', coordinates },
     }
 
-    // Build GeoJSON dots at label hours
     const dotFeatures = track
       .filter(([h]) => LABEL_HOURS.includes(h))
       .map(([h, lat, lon]) => ({
@@ -106,30 +115,28 @@ function render(map, drawnRef) {
         },
       }))
 
-    // Current position marker (interpolated)
+    // Current position interpolation
     const currentIdx = track.findIndex(([h]) => h >= hour)
     if (currentIdx >= 1) {
       const [h0, lat0, lon0] = track[currentIdx - 1]
       const [h1, lat1, lon1] = track[currentIdx]
       const t = (hour - h0) / (h1 - h0 || 1)
-      const cLat = lat0 + (lat1 - lat0) * t
-      const cLon = lon0 + (lon1 - lon0) * t
       dotFeatures.push({
         type: 'Feature',
-        geometry: { type: 'Point', coordinates: [cLon, cLat] },
+        geometry: { type: 'Point', coordinates: [lon0 + (lon1 - lon0) * t, lat0 + (lat1 - lat0) * t] },
         properties: { hour, label: `▶${hour}h`, isPrimary, isNow: true },
       })
     }
 
     const dotsGeoJSON = { type: 'FeatureCollection', features: dotFeatures }
 
-    // ── Add or update source + layers ──
+    // Add or update
     if (map.getSource(srcId)) {
-      // Update existing
       map.getSource(srcId).setData(lineGeoJSON)
-      map.getSource(srcId + '-dots').setData(dotsGeoJSON)
+      if (map.getSource(srcId + '-dots')) {
+        map.getSource(srcId + '-dots').setData(dotsGeoJSON)
+      }
     } else {
-      // Line source + layer
       map.addSource(srcId, { type: 'geojson', data: lineGeoJSON })
       map.addLayer({
         id: lineId,
@@ -144,7 +151,6 @@ function render(map, drawnRef) {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
 
-      // Dots source + layers
       map.addSource(srcId + '-dots', { type: 'geojson', data: dotsGeoJSON })
       map.addLayer({
         id: dotId,
@@ -158,6 +164,8 @@ function render(map, drawnRef) {
           'circle-stroke-color': '#0A0E14',
         },
       })
+
+      // Symbol layer for hour labels — use Open Sans (available in OpenFreeMap/Liberty style)
       map.addLayer({
         id: dotId + '-label',
         type: 'symbol',
@@ -181,13 +189,11 @@ function render(map, drawnRef) {
       drawnRef.current.add(srcId)
     }
 
-    // Update paint properties for primary/non-primary changes
+    // Update visibility/paint
     if (map.getLayer(lineId)) {
       map.setPaintProperty(lineId, 'line-width', isPrimary ? 3 : 1.5)
       map.setPaintProperty(lineId, 'line-opacity', opacity)
       map.setLayoutProperty(lineId, 'visibility', visible ? 'visible' : 'none')
-
-      // Dasharray can't be updated dynamically with expressions, so set it
       map.setPaintProperty(lineId, 'line-dasharray', isPrimary ? [1] : [4, 3])
     }
     if (map.getLayer(dotId)) {
@@ -202,21 +208,21 @@ function render(map, drawnRef) {
 }
 
 function removeModel(map, modelId) {
-  const lineId = LINE_PREFIX + modelId
-  const dotId  = DOT_PREFIX  + modelId
-  const srcId  = SRC_PREFIX  + modelId
-
-  if (map.getLayer(dotId + '-label')) map.removeLayer(dotId + '-label')
-  if (map.getLayer(dotId))           map.removeLayer(dotId)
-  if (map.getLayer(lineId))          map.removeLayer(lineId)
-  if (map.getSource(srcId + '-dots')) map.removeSource(srcId + '-dots')
-  if (map.getSource(srcId))          map.removeSource(srcId)
+  try {
+    const lineId = LINE_PREFIX + modelId
+    const dotId  = DOT_PREFIX  + modelId
+    const srcId  = SRC_PREFIX  + modelId
+    if (map.getLayer(dotId + '-label')) map.removeLayer(dotId + '-label')
+    if (map.getLayer(dotId))           map.removeLayer(dotId)
+    if (map.getLayer(lineId))          map.removeLayer(lineId)
+    if (map.getSource(srcId + '-dots')) map.removeSource(srcId + '-dots')
+    if (map.getSource(srcId))          map.removeSource(srcId)
+  } catch {}
 }
 
 function cleanup(map, drawnRef) {
   for (const srcId of drawnRef.current) {
-    const modelId = srcId.replace(SRC_PREFIX, '')
-    removeModel(map, modelId)
+    removeModel(map, srcId.replace(SRC_PREFIX, ''))
   }
   drawnRef.current.clear()
 }

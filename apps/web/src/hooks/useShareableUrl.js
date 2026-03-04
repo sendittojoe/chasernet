@@ -16,12 +16,12 @@ export function useShareableUrl(mapObj) {
     function updateHash() {
       const center = map.getCenter()
       const zoom   = map.getZoom().toFixed(1)
-      const layer  = activeLayers?.[0] ?? 'wind'
+      const layer  = activeLayers?.find(l => l.visible)?.id ?? 'wind'
       const params = new URLSearchParams({
         lat:   center.lat.toFixed(4),
         lon:   center.lng.toFixed(4),
         zoom,
-        model: primaryModel ?? 'ecmwf',
+        model: primaryModel ?? 'GFS',
         layer,
         hour:  String(hour ?? 0),
       })
@@ -41,7 +41,12 @@ export function useShareableUrl(mapObj) {
       const params = new URLSearchParams(hash)
       const h = parseInt(params.get('hour') ?? '0')
       if (!isNaN(h)) setHour(h)
-      // lat/lon/zoom applied after map loads in ChaserMap
+      const layer = params.get('layer')
+      if (layer && ['wind','temp','precip','cape','500mb','mslp'].includes(layer)) {
+        useMapStore.getState().setLayer(layer)
+      }
+      const model = params.get('model')
+      if (model) useMapStore.getState().setPrimaryModel(model)
     } catch(_) {}
   }, [])
 

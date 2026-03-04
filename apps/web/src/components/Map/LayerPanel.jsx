@@ -1,7 +1,7 @@
-import { useMapStore, AVAILABLE_LAYERS } from '../../stores/mapStore.js'
+import { useMapStore, ALL_LAYERS as AVAILABLE_LAYERS } from '../../stores/mapStore.js'
 
 export default function LayerPanel({ onClose }) {
-  const { activeLayers, toggleLayer, setLayerOpacity, removeLayer, modelA, modelB, setModelA, setModelB, split, setSplit } = useMapStore()
+  const { activeLayers, toggleLayer, setLayerOpacity, removeLayer, primaryModel, setPrimaryModel, compareModel, setCompareModel, split, setSplit } = useMapStore()
   const MODELS = ['Euro IFS','GFS','EC-AIFS','HRRR','ICON','NAM 3km','CMC','UKMET','GraphCast','GEFS']
 
   return (
@@ -60,14 +60,14 @@ export default function LayerPanel({ onClose }) {
         <div style={{ display:'flex', gap:6, marginBottom:8 }}>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:9, color:'var(--t3)', marginBottom:4 }}>PRIMARY</div>
-            <select value={modelA} onChange={e => setModelA(e.target.value)} style={{ width:'100%', padding:'5px 8px', borderRadius:6, fontFamily:'var(--mono)', fontSize:11, background:'var(--card)', border:'1px solid var(--border)', color:'var(--t1)', cursor:'pointer' }}>
+            <select value={primaryModel} onChange={e => setPrimaryModel(e.target.value)} style={{ width:'100%', padding:'5px 8px', borderRadius:6, fontFamily:'var(--mono)', fontSize:11, background:'var(--card)', border:'1px solid var(--border)', color:'var(--t1)', cursor:'pointer' }}>
               {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           {split && (
             <div style={{ flex:1 }}>
               <div style={{ fontSize:9, color:'var(--t3)', marginBottom:4 }}>COMPARE</div>
-              <select value={modelB} onChange={e => setModelB(e.target.value)} style={{ width:'100%', padding:'5px 8px', borderRadius:6, fontFamily:'var(--mono)', fontSize:11, background:'var(--card)', border:'1px solid var(--border)', color:'var(--t1)', cursor:'pointer' }}>
+              <select value={compareModel} onChange={e => setCompareModel(e.target.value)} style={{ width:'100%', padding:'5px 8px', borderRadius:6, fontFamily:'var(--mono)', fontSize:11, background:'var(--card)', border:'1px solid var(--border)', color:'var(--t1)', cursor:'pointer' }}>
                 {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>

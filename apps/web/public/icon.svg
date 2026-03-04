@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#060A12"/>
+  <circle cx="256" cy="240" r="140" fill="none" stroke="#38BDF8" stroke-width="8" opacity="0.3"/>
+  <circle cx="256" cy="240" r="90" fill="none" stroke="#38BDF8" stroke-width="6" opacity="0.5"/>
+  <circle cx="256" cy="240" r="40" fill="none" stroke="#38BDF8" stroke-width="4" opacity="0.7"/>
+  <!-- Spiral arms -->
+  <path d="M256 240 Q320 180 350 240 Q380 300 320 340 Q260 380 220 320 Q180 260 220 220 Q240 200 256 240" fill="none" stroke="#38BDF8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M256 240 Q192 300 162 240 Q132 180 192 140 Q252 100 292 160 Q332 220 292 260 Q272 280 256 240" fill="none" stroke="#0EA5E9" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <!-- Center eye -->
+  <circle cx="256" cy="240" r="12" fill="#38BDF8"/>
+  <!-- Text -->
+  <text x="256" y="430" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="52" font-weight="800" fill="#E2E8F0" letter-spacing="4">CHASERNET</text>
+</svg>

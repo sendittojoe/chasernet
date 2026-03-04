@@ -11,10 +11,14 @@ export default function Landing() {
   const [form, setForm] = useState({ username:'', email:'', password:'' })
   const [err,  setErr]  = useState(null)
   const [loading, setLoading] = useState(false)
+  const [forgotMode, setForgotMode] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
 
   const update = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
-  async function handleSubmit() {
+  async function handleSubmit(e) {
+    if (e) e.preventDefault()
     setErr(null)
     setLoading(true)
     try {
@@ -35,9 +39,81 @@ export default function Landing() {
     }
   }
 
-  function devBypass() {
-    login({ id:'dev', username:'dev_user', role:'admin', avatarColor:'#38BDF8' }, 'dev-token')
-    navigate('/app')
+  async function handleForgot(e) {
+    if (e) e.preventDefault()
+    setErr(null)
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      })
+      // Always show success to prevent email enumeration
+      setForgotSent(true)
+    } catch {
+      setForgotSent(true)
+    }
+  }
+
+  const inputStyle = {
+    width:'100%', padding:'10px 12px', boxSizing:'border-box',
+    background:'var(--card)', border:'1px solid var(--border)',
+    borderRadius:6, color:'var(--t1)', fontSize:13,
+    fontFamily:'var(--sans)', outline:'none',
+  }
+
+  if (forgotMode) {
+    return (
+      <div style={{
+        minHeight:'100dvh', background:'var(--bg)',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        padding:'24px', fontFamily:'var(--sans)',
+      }}>
+        <div style={{ width:'100%', maxWidth:400 }}>
+          <div style={{ textAlign:'center', marginBottom:32 }}>
+            <div style={{ fontSize:48, marginBottom:8 }}>🔑</div>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'var(--blue)', fontFamily:'var(--mono)' }}>
+              RESET PASSWORD
+            </h1>
+            <p style={{ color:'var(--t2)', fontSize:13, marginTop:4 }}>
+              Enter your email and we'll send a reset link
+            </p>
+          </div>
+
+          {forgotSent ? (
+            <div style={{
+              padding:'16px', background:'rgba(34,197,94,0.1)',
+              border:'1px solid rgba(34,197,94,0.3)', borderRadius:8,
+              color:'#22C55E', fontSize:13, textAlign:'center', marginBottom:20,
+            }}>
+              If an account exists with that email, a reset link has been sent.
+              Check your inbox.
+            </div>
+          ) : (
+            <div onSubmit={handleForgot} style={{ marginBottom:20 }}>
+              <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>EMAIL</label>
+              <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                autoComplete="email" placeholder="you@example.com" style={inputStyle}
+                onKeyDown={e => e.key === 'Enter' && handleForgot()} />
+              <button onClick={handleForgot} style={{
+                width:'100%', padding:'11px', background:'var(--blue)', border:'none',
+                borderRadius:7, color:'var(--bg)', fontWeight:700, fontSize:14, marginTop:16, cursor:'pointer',
+              }}>
+                Send Reset Link
+              </button>
+            </div>
+          )}
+
+          <button onClick={() => { setForgotMode(false); setForgotSent(false) }} style={{
+            width:'100%', padding:'9px', background:'transparent',
+            border:'1px solid var(--border)', borderRadius:7,
+            color:'var(--t3)', fontSize:12, cursor:'pointer',
+          }}>
+            ← Back to Login
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -63,8 +139,8 @@ export default function Landing() {
 
         <div style={{ display:'flex', marginBottom:20, background:'var(--card)', borderRadius:8, padding:3 }}>
           {['login','signup'].map(m => (
-            <button key={m} onClick={() => setMode(m)} style={{
-              flex:1, padding:'8px 0', border:'none', borderRadius:6,
+            <button key={m} onClick={() => { setMode(m); setErr(null) }} style={{
+              flex:1, padding:'8px 0', border:'none', borderRadius:6, cursor:'pointer',
               background: mode===m ? 'var(--panel)' : 'transparent',
               color:      mode===m ? 'var(--t1)' : 'var(--t3)',
               fontWeight: mode===m ? 700 : 400, fontSize:13,
@@ -74,46 +150,70 @@ export default function Landing() {
           ))}
         </div>
 
-        {mode === 'signup' && (
+        {/* Using a real form element so password managers detect submission */}
+        <form onSubmit={handleSubmit} autoComplete="on">
+
+          {mode === 'signup' && (
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>USERNAME</label>
+              <input type="text" name="username" autoComplete="username"
+                value={form.username} onChange={e => update('username', e.target.value)}
+                placeholder="wx_hawk" style={inputStyle} />
+            </div>
+          )}
+
           <div style={{ marginBottom:12 }}>
-            <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>USERNAME</label>
-            <input type="text" value={form.username} onChange={e => update('username', e.target.value)}
-              placeholder="wx_hawk" style={{ width:'100%', padding:'10px 12px' }} />
+            <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>EMAIL</label>
+            <input type="email" name="email" autoComplete="email"
+              value={form.email} onChange={e => update('email', e.target.value)}
+              placeholder="you@example.com" style={inputStyle} />
           </div>
-        )}
 
-        <div style={{ marginBottom:12 }}>
-          <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>EMAIL</label>
-          <input type="email" value={form.email} onChange={e => update('email', e.target.value)}
-            placeholder="you@example.com" style={{ width:'100%', padding:'10px 12px' }} />
-        </div>
-
-        <div style={{ marginBottom:20 }}>
-          <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>PASSWORD</label>
-          <input type="password" value={form.password} onChange={e => update('password', e.target.value)}
-            placeholder="••••••••" style={{ width:'100%', padding:'10px 12px' }}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
-        </div>
-
-        {err && (
-          <div style={{ padding:'9px 12px', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)',
-            borderRadius:6, color:'#EF4444', fontSize:12, marginBottom:16 }}>
-            {err}
+          <div style={{ marginBottom:8 }}>
+            <label style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--mono)', display:'block', marginBottom:4 }}>PASSWORD</label>
+            <input type="password" name="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              value={form.password} onChange={e => update('password', e.target.value)}
+              placeholder="••••••••" style={inputStyle} />
           </div>
-        )}
 
-        <button onClick={handleSubmit} disabled={loading} style={{
-          width:'100%', padding:'11px', background:'var(--blue)', border:'none',
-          borderRadius:7, color:'var(--bg)', fontWeight:700, fontSize:14,
-        }}>
-          {loading ? 'Loading…' : mode === 'login' ? 'Log In' : 'Create Account'}
-        </button>
+          {mode === 'login' && (
+            <div style={{ textAlign:'right', marginBottom:16 }}>
+              <button type="button" onClick={() => setForgotMode(true)} style={{
+                background:'none', border:'none', color:'var(--blue)',
+                fontSize:11, cursor:'pointer', fontFamily:'var(--mono)',
+                padding:0, textDecoration:'underline', opacity:0.8,
+              }}>
+                Forgot password?
+              </button>
+            </div>
+          )}
+
+          {mode === 'signup' && <div style={{ height:8 }} />}
+
+          {err && (
+            <div style={{ padding:'9px 12px', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)',
+              borderRadius:6, color:'#EF4444', fontSize:12, marginBottom:16 }}>
+              {err}
+            </div>
+          )}
+
+          <button type="submit" disabled={loading} style={{
+            width:'100%', padding:'11px', background:'var(--blue)', border:'none',
+            borderRadius:7, color:'var(--bg)', fontWeight:700, fontSize:14, cursor:'pointer',
+          }}>
+            {loading ? 'Loading…' : mode === 'login' ? 'Log In' : 'Create Account'}
+          </button>
+        </form>
 
         {import.meta.env.DEV && (
-          <button onClick={devBypass} style={{
+          <button onClick={() => {
+            login({ id:'dev', username:'dev_user', role:'admin', avatarColor:'#38BDF8' }, 'dev-token')
+            navigate('/app')
+          }} style={{
             width:'100%', marginTop:10, padding:'9px', background:'transparent',
             border:'1px dashed var(--border)', borderRadius:7,
-            color:'var(--t3)', fontSize:12,
+            color:'var(--t3)', fontSize:12, cursor:'pointer',
           }}>
             Dev bypass (skip auth)
           </button>

@@ -4,17 +4,13 @@ import { useMapStore } from '../../stores/mapStore.js'
 const SOURCE_ID = 'noaa-sst'
 const LAYER_ID  = 'noaa-sst-layer'
 
-// NOAA CoastWatch SST tiles (GOES/OSTIA composite)
-// These are freely available WMS tiles served as raster
-const SST_TILE_URL =
-  'https://coastwatch.pfeg.noaa.gov/erddap/wms/jplMURSST41/request?' +
-  'service=WMS&version=1.1.1&request=GetMap&layers=jplMURSST41:analysed_sst' +
-  '&styles=&crs=EPSG:3857&format=image/png&transparent=true' +
-  '&width=256&height=256&bbox={bbox-epsg-3857}'
+// Proxy SST tiles through our API to avoid CORS issues
+const API = import.meta.env.VITE_API_BASE ?? 'https://api.chasernet.com'
+const SST_TILE_URL = `${API}/proxy/sst?z={z}&x={x}&y={y}`
 
 /**
- * Adds NOAA SST (Sea Surface Temperature) tiles to the MapLibre map.
- * Uses ERDDAP WMS endpoint for global SST data.
+ * Adds SST (Sea Surface Temperature) tiles to the MapLibre map.
+ * Routes through our API proxy to avoid CORS issues with NOAA ERDDAP.
  */
 export default function SSTLayer({ map }) {
 
@@ -22,7 +18,9 @@ export default function SSTLayer({ map }) {
     if (!map) return
 
     function addSST() {
-      if (map.getSource(SOURCE_ID)) return
+      try {
+        if (map.getSource(SOURCE_ID)) return
+      } catch { return }
 
       map.addSource(SOURCE_ID, {
         type: 'raster',
@@ -41,15 +39,17 @@ export default function SSTLayer({ map }) {
       syncVisibility(map)
     }
 
-    if (map.isStyleLoaded()) {
-      addSST()
-    } else {
-      map.once('load', addSST)
+    // ChaserMap only renders us when ready=true (after map 'load')
+    try { addSST() } catch(e) {
+      console.warn('[SSTLayer] deferred:', e.message)
+      requestAnimationFrame(() => { try { addSST() } catch {} })
     }
 
     return () => {
-      if (map.getLayer(LAYER_ID))  map.removeLayer(LAYER_ID)
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
+      try {
+        if (map.style && map.getLayer(LAYER_ID))  map.removeLayer(LAYER_ID)
+        if (map.style && map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
+      } catch {}
     }
   }, [map])
 
@@ -67,7 +67,7 @@ export default function SSTLayer({ map }) {
 }
 
 function syncVisibility(map) {
-  if (!map.getLayer(LAYER_ID)) return
+  try { if (!map.style || !map.getLayer(LAYER_ID)) return } catch { return }
   const layers = useMapStore.getState().activeLayers
   const sst    = layers.find(l => l.id === 'sst')
   const visible = sst?.visible ?? false

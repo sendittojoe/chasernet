@@ -14,6 +14,8 @@ import discord           from './routes/discord.js'
 import proxy             from './routes/proxy.js'
 import dm                from './routes/dm.js'
 import tiles             from './routes/tiles.js'
+import weather           from './routes/weather.js'
+import { optionalAuth }  from './middleware/auth.js'
 
 const app = new Hono()
 
@@ -21,7 +23,12 @@ app.use('*', timing())
 app.use('*', logger())
 app.use('*', cors({
   origin: (origin, c) => {
-    const allowed = [c.env.ALLOWED_ORIGIN, 'http://localhost:5173']
+    const allowed = [
+      c.env.ALLOWED_ORIGIN ?? 'https://chasernet.com',
+      'http://localhost:5173',
+      'https://chasernet.com',
+      'https://www.chasernet.com',
+    ]
     return allowed.includes(origin) ? origin : allowed[0]
   },
   allowMethods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
@@ -29,7 +36,19 @@ app.use('*', cors({
   credentials: true,
 }))
 
-app.get('/', (c) => c.json({ status: 'ok', service: 'chasernet-api', version: '0.2.0' }))
+// Apply optional auth globally — user info available if token present
+app.use('*', optionalAuth())
+
+app.get('/', (c) => c.json({
+  status: 'ok',
+  service: 'chasernet-api',
+  version: '1.0.0',
+  endpoints: [
+    '/auth', '/storms', '/models', '/battles', '/forum',
+    '/users', '/messages', '/notifications', '/discord',
+    '/proxy', '/dm', '/tiles', '/weather',
+  ]
+}))
 
 app.route('/auth',          auth)
 app.route('/storms',        storms)
@@ -43,6 +62,7 @@ app.route('/discord',       discord)
 app.route('/proxy',         proxy)
 app.route('/dm',            dm)
 app.route('/tiles',         tiles)
+app.route('/weather',       weather)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
 app.onError((err, c) => {

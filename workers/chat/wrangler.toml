@@ -25,3 +25,6 @@ new_classes          = ["UserPresenceDO"]
 
 [dev]
 port = 8788
+
+# Secrets (set via wrangler secret put):
+# JWT_SECRET — shared with API worker for token verification

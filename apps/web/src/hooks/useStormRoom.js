@@ -21,7 +21,7 @@ export function useStormRoom(roomId) {
   useEffect(() => {
     // Phase 1: WebSocket not yet wired, return early
     // Remove this guard in Phase 3 when Durable Objects are deployed
-    if (!roomId || import.meta.env.VITE_ENABLE_WS !== 'true') return
+    if (!roomId) return
 
     const url = `${WS_BASE}/room/${roomId}?token=${token}`
     const ws  = new WebSocket(url)

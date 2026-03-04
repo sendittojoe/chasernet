@@ -1,100 +1,131 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useMapStore } from '../../stores/mapStore.js'
 
 const RAINVIEWER_API = 'https://api.rainviewer.com/public/weather-maps.json'
-const SOURCE_ID = 'rainviewer-radar'
-const LAYER_ID  = 'rainviewer-radar-layer'
 
 /**
- * Adds RainViewer radar tiles to the MapLibre map.
- * Fetches latest radar timestamp, adds raster tile layer,
- * and syncs visibility/opacity with mapStore.activeLayers.
+ * RadarLayer — simplest possible approach:
+ * 1. Fetch RainViewer frames on mount
+ * 2. Add all 6 as raster layers
+ * 3. Animate through them on an interval
+ * 4. Subscribe to store for visibility/opacity
  */
 export default function RadarLayer({ map }) {
-  const tsRef = useRef(null)
-  const intervalRef = useRef(null)
+  const framesRef  = useRef([])
+  const indexRef   = useRef(0)
+  const timerRef   = useRef(null)
+  const readyRef   = useRef(false)
 
-  // Add/update radar source + layer
   useEffect(() => {
-    if (!map) return
+    if (!map) {
+      console.log('[Radar] no map prop')
+      return
+    }
+    console.log('[Radar] mount, styleLoaded=', map.isStyleLoaded?.())
 
-    async function loadRadar() {
+    let dead = false
+
+    async function go() {
+      console.log('[Radar] go() called')
       try {
-        const res  = await fetch(RAINVIEWER_API)
-        const data = await res.json()
-        const past = data?.radar?.past ?? []
-        if (!past.length) return
-        const latest = past[past.length - 1]
-        const ts = latest.path  // e.g. "/v2/radar/1709654400"
+        const res = await fetch(RAINVIEWER_API)
+        if (!res.ok) { console.warn('[Radar] API status', res.status); return }
+        const json = await res.json()
+        const past = json?.radar?.past ?? []
+        console.log('[Radar] got', past.length, 'frames')
+        if (!past.length || dead) return
 
-        // Skip if same timestamp
-        if (tsRef.current === ts) return
-        tsRef.current = ts
+        const frames = past.slice(-6)
+        framesRef.current = frames
 
-        const tileUrl = `https://tilecache.rainviewer.com${ts}/256/{z}/{x}/{y}/6/1_1.png`
+        // Add sources + layers
+        frames.forEach((f, i) => {
+          const sid = 'rv-s-' + i
+          const lid = 'rv-l-' + i
+          const tileUrl = `https://tilecache.rainviewer.com${f.path}/256/{z}/{x}/{y}/6/1_1.png`
 
-        // Remove old source/layer if exists
-        if (map.getLayer(LAYER_ID))  map.removeLayer(LAYER_ID)
-        if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
+          // Clean up if they exist from a previous mount
+          try { map.getLayer(lid) && map.removeLayer(lid) } catch {}
+          try { map.getSource(sid) && map.removeSource(sid) } catch {}
 
-        map.addSource(SOURCE_ID, {
-          type: 'raster',
-          tiles: [tileUrl],
-          tileSize: 256,
-          attribution: '© RainViewer',
+          map.addSource(sid, { type: 'raster', tiles: [tileUrl], tileSize: 256 })
+          map.addLayer({
+            id: lid,
+            type: 'raster',
+            source: sid,
+            paint: {
+              'raster-opacity': i === frames.length - 1 ? 0.65 : 0.01,
+              'raster-opacity-transition': { duration: 0 },
+            },
+          })
         })
 
-        map.addLayer({
-          id: LAYER_ID,
-          type: 'raster',
-          source: SOURCE_ID,
-          paint: { 'raster-opacity': 0.65 },
-        })
+        indexRef.current = frames.length - 1
+        readyRef.current = true
+        console.log('[Radar] layers added, starting animation')
 
-        // Apply current store state immediately
-        syncVisibility(map)
+        // Start animation
+        timerRef.current = setInterval(() => {
+          if (dead || !readyRef.current) return
+          const n = framesRef.current.length
+          if (!n) return
+
+          // Check store
+          const state = useMapStore.getState()
+          const entry = state.activeLayers.find(l => l.id === 'radar')
+          const vis = entry?.visible ?? false
+          const opa = entry?.opacity ?? 0.65
+
+          // Hide current
+          try { map.setPaintProperty('rv-l-' + indexRef.current, 'raster-opacity', 0.01) } catch {}
+
+          // Advance
+          indexRef.current = (indexRef.current + 1) % n
+
+          // Show next (only if visible)
+          if (vis) {
+            try { map.setPaintProperty('rv-l-' + indexRef.current, 'raster-opacity', opa) } catch {}
+          }
+        }, 800)
+
       } catch (err) {
-        console.warn('[RadarLayer] Failed to load RainViewer:', err)
+        console.error('[Radar] error:', err)
       }
     }
 
-    // Wait for map style to be loaded
-    if (map.isStyleLoaded()) {
-      loadRadar()
-    } else {
-      map.once('load', loadRadar)
-    }
+    // Style is guaranteed loaded because ChaserMap only renders us after ready=true
+    go()
 
-    // Refresh radar every 5 minutes (RainViewer updates every 10min)
-    intervalRef.current = setInterval(loadRadar, 5 * 60 * 1000)
+    // Also sync visibility when store changes (e.g. user toggles radar off)
+    const unsub = useMapStore.subscribe((state) => {
+      if (!readyRef.current) return
+      const entry = state.activeLayers.find(l => l.id === 'radar')
+      const vis = entry?.visible ?? false
+      const opa = entry?.opacity ?? 0.65
+
+      framesRef.current.forEach((_, i) => {
+        try {
+          if (!vis) {
+            map.setPaintProperty('rv-l-' + i, 'raster-opacity', 0.01)
+          } else if (i === indexRef.current) {
+            map.setPaintProperty('rv-l-' + i, 'raster-opacity', opa)
+          }
+        } catch {}
+      })
+    })
 
     return () => {
-      clearInterval(intervalRef.current)
-      if (map.getLayer(LAYER_ID))  map.removeLayer(LAYER_ID)
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
+      dead = true
+      readyRef.current = false
+      if (timerRef.current) clearInterval(timerRef.current)
+      unsub()
+      // Cleanup layers
+      for (let i = 0; i < 6; i++) {
+        try { map.getLayer('rv-l-' + i) && map.removeLayer('rv-l-' + i) } catch {}
+        try { map.getSource('rv-s-' + i) && map.removeSource('rv-s-' + i) } catch {}
+      }
     }
   }, [map])
 
-  // Subscribe to store changes for visibility/opacity
-  useEffect(() => {
-    if (!map) return
-    const unsub = useMapStore.subscribe(
-      state => state.activeLayers,
-      () => syncVisibility(map),
-    )
-    return unsub
-  }, [map])
-
-  return null // pure side-effect component
-}
-
-function syncVisibility(map) {
-  if (!map.getLayer(LAYER_ID)) return
-  const layers = useMapStore.getState().activeLayers
-  const radar  = layers.find(l => l.id === 'radar')
-  const visible = radar?.visible ?? false
-  const opacity = radar?.opacity ?? 0.65
-
-  map.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none')
-  map.setPaintProperty(LAYER_ID, 'raster-opacity', opacity)
+  return null
 }

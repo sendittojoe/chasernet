@@ -4,8 +4,8 @@ import { create } from 'zustand'
  * roomStore — which storm room is active, and room metadata.
  */
 export const useRoomStore = create((set, get) => ({
-  // Active room id — null = Discovery Feed
-  activeRoom: null,
+  // Active room id — 'global' = default chat room
+  activeRoom: 'global',
 
   // Active right panel tab
   rightTab: 'live',    // live | analysis | models | battle

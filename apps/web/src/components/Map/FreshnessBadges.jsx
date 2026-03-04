@@ -19,6 +19,7 @@ export default function FreshnessBadges() {
       gap: 6,
       flexWrap: 'wrap',
       padding: '4px 0',
+      justifyContent: 'flex-end',
     }}>
       {models.map(m => {
         const f = freshness[m]

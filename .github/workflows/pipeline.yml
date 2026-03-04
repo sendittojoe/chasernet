@@ -1,0 +1,87 @@
+name: Weather Tile Pipeline
+
+on:
+  schedule:
+    - cron: '30 2,8,14,20 * * *'   # ~1.5h after GFS 00z/06z/12z/18z
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Model to process'
+        required: false
+        default: 'all'
+        type: choice
+        options: [gfs, ecmwf, all]
+      cycle:
+        description: 'Cycle (00, 06, 12, 18) — blank=auto'
+        required: false
+        default: ''
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wgrib2
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq wgrib2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install boto3
+
+      - name: Determine cycle
+        id: cycle
+        run: |
+          if [ -n "${{ inputs.cycle }}" ]; then CYCLE="${{ inputs.cycle }}"
+          else
+            HOUR=$(date -u +%H)
+            if   [ "$HOUR" -ge 20 ]; then CYCLE="18"
+            elif [ "$HOUR" -ge 14 ]; then CYCLE="12"
+            elif [ "$HOUR" -ge  8 ]; then CYCLE="06"
+            else CYCLE="00"; fi
+          fi
+          echo "date=$(date -u +%Y%m%d)" >> $GITHUB_OUTPUT
+          echo "cycle=$CYCLE" >> $GITHUB_OUTPUT
+          echo "model=${{ inputs.model || 'all' }}" >> $GITHUB_OUTPUT
+
+      - name: Run GRIB2 pipeline
+        run: |
+          python pipeline/process_grib.py \
+            --model ${{ steps.cycle.outputs.model }} \
+            --date  ${{ steps.cycle.outputs.date }} \
+            --cycle ${{ steps.cycle.outputs.cycle }} \
+            --output ./tiles-output
+
+      - name: Generate index
+        run: |
+          python pipeline/update_index.py \
+            --date  ${{ steps.cycle.outputs.date }} \
+            --cycle ${{ steps.cycle.outputs.cycle }}z \
+            --output ./tiles-output/index.json
+
+      - name: Upload to R2
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+        run: python pipeline/upload_to_r2.py ./tiles-output
+
+      - name: Notify API + push model alerts
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -sf -X POST https://api.chasernet.com/tiles/refresh \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"date\":\"${{ steps.cycle.outputs.date }}\",\"cycle\":\"${{ steps.cycle.outputs.cycle }}z\"}" \
+          || echo "⚠️ API notify failed"
+
+      - name: Summary
+        run: |
+          TILES=$(find ./tiles-output -name '*.json' -not -name 'index.json' | wc -l)
+          echo "### 🌊 Pipeline: ${{ steps.cycle.outputs.model }} ${{ steps.cycle.outputs.date }} ${{ steps.cycle.outputs.cycle }}z — $TILES tiles" >> $GITHUB_STEP_SUMMARY

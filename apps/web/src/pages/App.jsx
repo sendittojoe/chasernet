@@ -11,6 +11,7 @@ import DirectMessages  from './DirectMessages.jsx'
 import Members         from './Members.jsx'
 import NotFound    from './NotFound.jsx'
 import { useUserStore } from '../stores/userStore.js'
+import Settings from '../pages/Settings.jsx'
 
 function Protected({ children }) {
   const { user, onboardingComplete } = useUserStore()
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="storm/:stormId"          element={<StormRoom />} />
           <Route path="profile/:username"       element={<Profile />} />
           <Route path="admin"                   element={<AdminPanel />} />
+          <Route path="settings"                   element={<Settings />} />
           <Route path="forums"                  element={<Forums />} />
           <Route path="forums/:channelId"       element={<Forums />} />
           <Route path="messages"                element={<DirectMessages />} />

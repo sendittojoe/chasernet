@@ -94,6 +94,70 @@ auth.get('/me', async (c) => {
   }
 })
 
+
+// ── PATCH /auth/me — update profile (username, email) ──
+auth.patch('/me', async (c) => {
+  const userId = c.get('userId')
+  if (!userId) return c.json({ error: 'Authentication required' }, 401)
+
+  const { username, email } = await c.req.json()
+  const db = getDB(c.env.DB)
+  const updates = []
+  const values = []
+
+  if (username) {
+    // Check uniqueness
+    const existing = await db.first('SELECT id FROM users WHERE username = ? AND id != ?', [username, userId])
+    if (existing) return c.json({ error: 'Username already taken' }, 409)
+    updates.push('username = ?')
+    values.push(username)
+  }
+
+  if (email) {
+    const existing = await db.first('SELECT id FROM users WHERE email = ? AND id != ?', [email, userId])
+    if (existing) return c.json({ error: 'Email already in use' }, 409)
+    updates.push('email = ?')
+    values.push(email)
+  }
+
+  if (updates.length === 0) return c.json({ error: 'No fields to update' }, 400)
+
+  values.push(userId)
+  await db.run('UPDATE users SET ' + updates.join(', ') + ' WHERE id = ?', values)
+
+  const updated = await db.first('SELECT id, username, role, avatar_color FROM users WHERE id = ?', [userId])
+  return c.json({ user: { id: updated.id, username: updated.username, role: updated.role, avatarColor: updated.avatar_color } })
+})
+
+// ── POST /auth/password — change password ──
+auth.post('/password', async (c) => {
+  const userId = c.get('userId')
+  if (!userId) return c.json({ error: 'Authentication required' }, 401)
+
+  const { currentPassword, newPassword } = await c.req.json()
+  if (!currentPassword || !newPassword) return c.json({ error: 'Current and new password required' }, 400)
+  if (newPassword.length < 6) return c.json({ error: 'Password must be at least 6 characters' }, 400)
+
+  const db = getDB(c.env.DB)
+  const user = await db.first('SELECT password_hash FROM users WHERE id = ?', [userId])
+  if (!user) return c.json({ error: 'User not found' }, 404)
+
+  const ok = await verifyPassword(currentPassword, user.password_hash)
+  if (!ok) return c.json({ error: 'Current password is incorrect' }, 401)
+
+  const newHash = await hashPassword(newPassword)
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, userId])
+
+  return c.json({ ok: true })
+})
+
+// ── POST /auth/forgot — request password reset (stub) ──
+auth.post('/forgot', async (c) => {
+  // In production this would send an email with a reset token.
+  // For now, return success to prevent email enumeration.
+  return c.json({ ok: true, message: 'If an account exists, a reset link has been sent.' })
+})
+
 export default auth
 
 // ── Crypto helpers ────────────────────────────────
